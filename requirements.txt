@@ -1,7 +1,0 @@
-numpy
-opencv-python
-matplotlib
-pandas
-plotly
-open3d
-scikit-learn
