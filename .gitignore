@@ -2,3 +2,6 @@
 __pycache__/
 .ipynb_checkpoints/
 .venv/
+.pytest_cache/
+.ruff_cache/
+outputs/
