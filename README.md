@@ -17,19 +17,20 @@ Two solids with known geometry, each measured from a single laser image taken in
 
 | Quantity | Result |
 |---|---|
-| Distance of the points from the nominal profile (median / rms) | Corpo 6: 0.46 / 0.99 mm · Corpo 5: 0.56 / 0.94 mm |
-| Peak heights, Corpo 6 (nominal 45 / 25 / 45 mm) | 44.2 / 24.0 / 44.9 mm, mean error −0.62 ± 0.37 mm |
-| Peak heights, Corpo 5 (nominal 35 / 30 / 45 mm) | 35.1 / 30.1 / 45.8 mm, mean error +0.37 ± 0.32 mm |
-| Flank inclination, Corpo 6 | within 3.1° of the drawing (measured 61.0°, 68.8°, 61.9°, 81.6°, 55.3° vs 60°, 70°, 65°, 80°, 55°) |
+| Distance of the points from the nominal profile (median / rms) | Corpo 6: 0.59 / 1.13 mm · Corpo 5: 0.68 / 1.09 mm |
+| Peak heights, Corpo 6 (nominal 45 / 25 / 45 mm) | 44.3 / 23.9 / 44.5 mm, mean error −0.77 ± 0.21 mm |
+| Peak heights, Corpo 5 (nominal 35 / 30 / 45 mm) | 34.8 / 29.6 / 45.5 mm, mean error −0.05 ± 0.38 mm |
+| Flank inclination, Corpo 6 | within 3.8° of the drawing (measured 61.6°, 71.9°, 61.2°, 82.8°, 54.8° vs 60°, 70°, 65°, 80°, 55°) |
 | Light plane, error on held-out points | 0.51 mm rms (10% of the points held out) |
-| Camera, reprojection residual | median 1.6 px (about 0.4 mm on the master) |
+| Camera, reprojection residual | median 1.7 px (about 0.4 mm on the master) |
 
 > [!NOTE]
 > Known limits, all visible in the plot above:
 > - The right flank of the first peak of Corpo 6 cannot be measured: it is too steep to be lit by the sheet and seen by the camera.
 > - On Corpo 5 the heights agree, but the central plateau sits about 3–4 mm to the left of the drawing. I have not established whether the cause is the printed part or the scan.
-> - Sharp peaks are underestimated by about 0.5 mm even on perfect synthetic data (see below), so part of the negative height error on Corpo 6 comes from the algorithm and not from the setup.
-> - The camera views at z = 330 and 340 mm have much larger residuals (median 3–7 px) than the others (about 1–1.5 px); I have not investigated why. Views beyond the main master are left out of the fit because the setup moved between those shots.
+> - All three heights of Corpo 6 are low (−0.77 mm on average). The same code has no height bias on synthetic data (see below), so the cause is in the real setup or calibration, not in the peak estimator.
+> - The camera views at z = 330 and 340 mm have much larger residuals (median 3–7 px) than the others (about 1–1.5 px). A richer per-view pose of the master (adding a height error and a rotation) brings them down to about 1 px, but it made the held-out profile error worse (about 0.5 mm to 0.8 mm), so it is not used. Views beyond the main master are left out of the fit because the setup moved between those shots.
+> - The target view at z = 300 mm used to be dropped because OpenCV's default blob detector rejects the large circles of the "L" when the master is close to the camera. Now that it is detected and used, the median distance on the real scans is about 0.1 mm higher than without it. The synthetic data cannot say which of the two is right; the view is kept because dropping it was an accident of the detector.
 
 ## How it works
 
@@ -71,12 +72,19 @@ Real images have no ground truth, so the measured error mixes the algorithm and 
 
 | Noise on the centres | Median distance from the true profile | 90th percentile |
 |---|---|---|
-| 0 px | 0.10 mm | 0.40 mm |
-| 0.5 px | 0.21 mm | 0.77 mm |
-| 1 px | 0.37 mm | 1.28 mm |
+| 0 px | 0.03 mm | 0.09 mm |
+| 0.5 px | 0.18 mm | 0.74 mm |
+| 1 px | 0.35 mm | 1.24 mm |
 | 2 px | 0.64 mm | 1.98 mm |
 
-The errors on the real images (0.5–0.7 mm median) are consistent with about 1–2 px of noise on the detected centres; I have not measured the real noise directly. The synthetic data also found a real defect: the camera fit invented a linear drift of the master along z even when the master did not move, which gave a systematic 0.25 mm error with no noise at all. A linear drift in the offsets is indistinguishable from a small tilt of the axis in the projection matrix, so `fit_camera` now removes it (the master is assumed to slide along z). The end-to-end tests in [tests/test_synthetic.py](tests/test_synthetic.py) fail without that fix.
+The errors on the real images (0.6–0.7 mm median) are consistent with about 1–2 px of noise on the detected centres; I have not measured the real noise directly. With 2 px of noise the sheet produces spurious peaks of up to 10 mm on the support plane, so `measure_peaks` needs `prominence=10` instead of 6.
+
+The synthetic data found four defects, each now covered by a test that fails without the fix:
+
+- **Master drift in the camera fit.** The fit invented a linear drift of the master along z even when it did not move (a 0.25 mm systematic error with no noise). A linear drift in the offsets is indistinguishable from a small tilt of the axis in the projection matrix, so `fit_camera` now removes it.
+- **Peak heights.** Sharp peaks were underestimated by about 0.5 mm, because the sheet has a thickness and the per-row centroid cuts the tip. `measure_peaks` now takes the intersection of the two flank lines, and the median of the points on a wide flat top. Over 8 seeds the bias goes from −0.52 mm to 0.00 mm without noise and from −0.44 mm to −0.01 mm at 0.5 px, with the same or lower rms.
+- **Centroid of the sheet.** It used only the saturated core, with half a pixel of resolution; it is now weighted by the intensity on the soft edges (median error without noise from 0.10 to 0.03 mm).
+- **Blob detector and profile alignment.** OpenCV's blob detector rejects circles above 5000 px², which dropped the large circles of the "L" when the master was close; and `align` could pick the mirrored profile with 2 px of noise because the vertical error was almost tied. It now decides with the distance in the (y, h) plane. The grid orientation is also fixed from the arms of the "L", since `findCirclesGrid` cannot tell a symmetric grid from its 180° rotation.
 
 ## Quick start
 
@@ -135,9 +143,9 @@ docs/figures/     figures produced by the notebooks
 
 Scanner 3D a triangolazione con telecamera e lama di luce, scritto da zero in Python con NumPy e OpenCV: calibrazione della camera, calibrazione del piano laser e misura in millimetri del profilo di solidi stampati in 3D. Progetto finale del corso *Sistemi di Visione 3D* (Università degli Studi di Brescia, A.A. 2024/25), riscritto come pacchetto testato.
 
-- **Risultati**: distanza mediana dal profilo nominale 0,46 mm (Corpo 6) e 0,56 mm (Corpo 5); altezze dei picchi entro circa 1 mm; piano della lama 0,51 mm rms sui punti esclusi.
-- **Validazione sintetica**: un generatore di immagini con geometria nota misura l'errore dell'algoritmo (0,10 mm mediani senza rumore, 0,64 mm con 2 px di rumore) e ha rivelato una deriva inventata degli offset del master, ora corretta.
-- **Limiti**: il fianco destro del primo picco del Corpo 6 non è illuminabile; nel Corpo 5 il piano centrale è 3–4 mm a sinistra del disegno, causa non accertata; le viste a z = 330 e 340 mm hanno residui alti (3–7 px), causa non indagata.
+- **Risultati**: distanza mediana dal profilo nominale 0,59 mm (Corpo 6) e 0,68 mm (Corpo 5); altezze dei picchi entro circa 1 mm; piano della lama 0,51 mm rms sui punti esclusi.
+- **Validazione sintetica**: un generatore di immagini con geometria nota misura l'errore dell'algoritmo (0,03 mm mediani senza rumore, 0,64 mm con 2 px di rumore) e ha rivelato quattro difetti (deriva degli offset del master, altezza dei picchi sottostimata di 0,5 mm, baricentro della lama, rilevamento dei cerchi grandi e allineamento specchiato), tutti corretti e coperti da test.
+- **Limiti**: il fianco destro del primo picco del Corpo 6 non è illuminabile; nel Corpo 5 il piano centrale è 3–4 mm a sinistra del disegno, causa non accertata; le tre altezze del Corpo 6 sono basse di 0,77 mm in media (non succede sui dati sintetici); le viste a z = 330 e 340 mm hanno residui alti (3–7 px).
 - **Uso**: `uv sync` e `uv run pytest`; i notebook sono in [notebooks/](notebooks/).
 - La traccia e i disegni dei solidi sono materiale del corso (S. Dello Iacono, D. Solinas) e non sono inclusi.
 
