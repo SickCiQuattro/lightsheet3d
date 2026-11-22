@@ -17,17 +17,18 @@ Two solids with known geometry, each measured from a single laser image taken in
 
 | Quantity | Result |
 |---|---|
-| Distance of the points from the nominal profile (median / rms) | Corpo 6: 0.53 / 1.04 mm · Corpo 5: 0.69 / 1.14 mm |
-| Peak heights, Corpo 6 (nominal 45 / 25 / 45 mm) | 44.6 / 24.2 / 45.2 mm, mean error −0.35 ± 0.42 mm |
-| Peak heights, Corpo 5 (nominal 35 / 30 / 45 mm) | 35.4 / 30.3 / 46.1 mm, mean error +0.63 ± 0.36 mm |
-| Flank inclination, Corpo 6 | within 5° of the drawing |
-| Light plane, error on held-out points | 0.50 mm rms (10% of the points held out) |
+| Distance of the points from the nominal profile (median / rms) | Corpo 6: 0.46 / 0.99 mm · Corpo 5: 0.56 / 0.94 mm |
+| Peak heights, Corpo 6 (nominal 45 / 25 / 45 mm) | 44.2 / 24.0 / 44.9 mm, mean error −0.62 ± 0.37 mm |
+| Peak heights, Corpo 5 (nominal 35 / 30 / 45 mm) | 35.1 / 30.1 / 45.8 mm, mean error +0.37 ± 0.32 mm |
+| Flank inclination, Corpo 6 | within 3.1° of the drawing (measured 61.0°, 68.8°, 61.9°, 81.6°, 55.3° vs 60°, 70°, 65°, 80°, 55°) |
+| Light plane, error on held-out points | 0.51 mm rms (10% of the points held out) |
 | Camera, reprojection residual | median 1.6 px (about 0.4 mm on the master) |
 
 > [!NOTE]
 > Known limits, all visible in the plot above:
 > - The right flank of the first peak of Corpo 6 cannot be measured: it is too steep to be lit by the sheet and seen by the camera.
 > - On Corpo 5 the heights agree, but the central plateau sits about 3–4 mm to the left of the drawing. I have not established whether the cause is the printed part or the scan.
+> - Sharp peaks are underestimated by about 0.5 mm even on perfect synthetic data (see below), so part of the negative height error on Corpo 6 comes from the algorithm and not from the setup.
 > - The camera views at z = 330 and 340 mm have much larger residuals (median 3–7 px) than the others (about 1–1.5 px); I have not investigated why. Views beyond the main master are left out of the fit because the setup moved between those shots.
 
 ## How it works
@@ -60,13 +61,30 @@ flowchart LR
 
 </details>
 
+## Validation on synthetic data
+
+Real images have no ground truth, so the measured error mixes the algorithm and the setup. `lightsheet3d.synthetic` renders images of a known scene (camera parameters taken from the real calibration, circle master, light sheet, a solid with its nominal profile) with the same names and format as the real ones; the pipeline reads them unchanged and the result is compared with the true geometry.
+
+![Synthetic master and light sheet on Corpo 6](docs/figures/synthetic_images.png)
+
+![Pipeline error against pixel noise on the synthetic data](docs/figures/synthetic_error_vs_noise.png)
+
+| Noise on the centres | Median distance from the true profile | 90th percentile |
+|---|---|---|
+| 0 px | 0.10 mm | 0.40 mm |
+| 0.5 px | 0.21 mm | 0.77 mm |
+| 1 px | 0.37 mm | 1.28 mm |
+| 2 px | 0.64 mm | 1.98 mm |
+
+The errors on the real images (0.5–0.7 mm median) are consistent with about 1–2 px of noise on the detected centres; I have not measured the real noise directly. The synthetic data also found a real defect: the camera fit invented a linear drift of the master along z even when the master did not move, which gave a systematic 0.25 mm error with no noise at all. A linear drift in the offsets is indistinguishable from a small tilt of the axis in the projection matrix, so `fit_camera` now removes it (the master is assumed to slide along z). The end-to-end tests in [tests/test_synthetic.py](tests/test_synthetic.py) fail without that fix.
+
 ## Quick start
 
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or later (developed on 3.15).
 
 ```bash
 uv sync
-uv run pytest        # about 20 s: includes the regressions on the real images
+uv run pytest        # about 30 s: includes the synthetic end-to-end tests and the regressions on the real images
 ```
 
 The notebooks open with the project kernel (`ipykernel` is a dev dependency), for example from VS Code. JupyterLab is not included: `pyyaml` has no wheel for Python 3.15 yet.
@@ -104,9 +122,10 @@ src/lightsheet3d/
   measure.py      profile levelling, heights and angles
   solids.py       nominal profiles, alignment and distance to the measured profile
   report.py       measured vs nominal plot
+  synthetic.py    synthetic images with known geometry and an end-to-end evaluation
   pipeline.py     from raw images to measurements
-tests/            synthetic unit tests and regressions on the real images
-notebooks/        three notebooks with saved outputs
+tests/            unit tests, synthetic end-to-end tests and regressions on the real images
+notebooks/        four notebooks with saved outputs (the fourth validates on synthetic data)
 data/             raw images: camera_calibration, light_plane_calibration, scans
 docs/figures/     figures produced by the notebooks
 ```
@@ -116,7 +135,8 @@ docs/figures/     figures produced by the notebooks
 
 Scanner 3D a triangolazione con telecamera e lama di luce, scritto da zero in Python con NumPy e OpenCV: calibrazione della camera, calibrazione del piano laser e misura in millimetri del profilo di solidi stampati in 3D. Progetto finale del corso *Sistemi di Visione 3D* (Università degli Studi di Brescia, A.A. 2024/25), riscritto come pacchetto testato.
 
-- **Risultati**: distanza mediana dal profilo nominale 0,53 mm (Corpo 6) e 0,69 mm (Corpo 5); altezze dei picchi entro circa 1 mm; piano della lama 0,50 mm rms sui punti esclusi.
+- **Risultati**: distanza mediana dal profilo nominale 0,46 mm (Corpo 6) e 0,56 mm (Corpo 5); altezze dei picchi entro circa 1 mm; piano della lama 0,51 mm rms sui punti esclusi.
+- **Validazione sintetica**: un generatore di immagini con geometria nota misura l'errore dell'algoritmo (0,10 mm mediani senza rumore, 0,64 mm con 2 px di rumore) e ha rivelato una deriva inventata degli offset del master, ora corretta.
 - **Limiti**: il fianco destro del primo picco del Corpo 6 non è illuminabile; nel Corpo 5 il piano centrale è 3–4 mm a sinistra del disegno, causa non accertata; le viste a z = 330 e 340 mm hanno residui alti (3–7 px), causa non indagata.
 - **Uso**: `uv sync` e `uv run pytest`; i notebook sono in [notebooks/](notebooks/).
 - La traccia e i disegni dei solidi sono materiale del corso (S. Dello Iacono, D. Solinas) e non sono inclusi.
