@@ -91,6 +91,7 @@ def fit_camera(world, image, view_ids, image_size, n_radial=2, reference_view=0,
     Il master non si muove solo lungo z fra le viste (setup instabile): lo
     spostamento laterale di ogni vista è un parametro di disturbo stimato,
     con la vista di riferimento fissata a zero che definisce l'origine.
+    Gli identificativi delle viste sono le quote z (mm).
     Funzione di costo robusta (soft L1) contro i centri mal rilevati.
     """
     world = np.asarray(world, np.float64)
@@ -99,9 +100,14 @@ def fit_camera(world, image, view_ids, image_size, n_radial=2, reference_view=0,
     ref = int(np.searchsorted(views, reference_view))
     free = np.arange(len(views)) != ref
 
+    dz = (views - views[ref]).astype(np.float64)
+
     def unpack(x):
         offsets = np.zeros((len(views), 2))
         offsets[free] = x[14 + n_radial:].reshape(-1, 2)
+        # Una deriva degli offset lineare in z è indistinguibile da una piccola inclinazione dell'asse
+        # in P (stessi residui): si fissa togliendola, cioè assumendo che il master scorra lungo z.
+        offsets -= dz[:, None] * ((dz[:, None] * offsets).sum(axis=0) / (dz**2).sum())
         return x[:12].reshape(3, 4), x[12:14], x[14:14 + n_radial], offsets
 
     def residuals(x):
