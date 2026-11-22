@@ -5,7 +5,7 @@ from pathlib import Path
 import cv2 as cv
 import numpy as np
 
-from .calibration import CameraModel, fit_camera
+from .calibration import CameraModel, fit_camera_robust
 from .grid import build_object_points, find_first_valid_circles_grid, orient_grid
 from .laser import laser_centroids
 from .lightplane import fit_plane, ray_plane_point, triangulate
@@ -29,6 +29,7 @@ class CameraCalibration:
     image: np.ndarray     # (n, 2) centri misurati, pixel grezzi
     view_ids: np.ndarray  # (n,) z della vista di ogni punto
     skipped: tuple        # file senza pattern o senza origine riconoscibile
+    inliers: np.ndarray   # (n,) False per i centri scartati come errati prima del fit finale
 
 
 def calibrate_camera(target_dir, z_max=PLATE_Z, pitch=20.0, image_size=(2130, 1420)):
@@ -52,8 +53,8 @@ def calibrate_camera(target_dir, z_max=PLATE_Z, pitch=20.0, image_size=(2130, 14
         image.append(centers)
         view_ids += [z] * len(centers)
     world, image, view_ids = np.vstack(world), np.vstack(image), np.array(view_ids)
-    model = fit_camera(world, image, view_ids, image_size, reference_view=z_max)
-    return CameraCalibration(model, world, image, view_ids, tuple(skipped))
+    model, inliers = fit_camera_robust(world, image, view_ids, image_size, reference_view=z_max)
+    return CameraCalibration(model, world, image, view_ids, tuple(skipped), inliers)
 
 
 @dataclass(frozen=True)
@@ -64,12 +65,12 @@ class LightPlaneCalibration:
     view_ids: np.ndarray       # (n,) quota nominale (dal nome file) della vista di ogni punto
 
 
-def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.1, seed=0):
-    """Piano della lama dai punti delle immagini con la lama sul master a z noto."""
+def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.1, seed=0, exclude=()):
+    """Piano della lama dai punti delle immagini con la lama sul master a z noto (viste in `exclude` escluse)."""
     points, view_ids = [], []
     for path in sorted(Path(lama_dir).glob("*.jpg")):
         z = z_from_name(path)
-        if z > z_max:
+        if z > z_max or z in exclude:
             continue
         uv = model.undistort(laser_centroids(cv.imread(str(path))))
         points.append(ray_plane_point(model.P, uv, z))

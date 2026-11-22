@@ -17,20 +17,20 @@ Two solids with known geometry, each measured from a single laser image taken in
 
 | Quantity | Result |
 |---|---|
-| Distance of the points from the nominal profile (median / rms) | Corpo 6: 0.59 / 1.13 mm · Corpo 5: 0.68 / 1.09 mm |
-| Peak heights, Corpo 6 (nominal 45 / 25 / 45 mm) | 44.3 / 23.9 / 44.5 mm, mean error −0.77 ± 0.21 mm |
-| Peak heights, Corpo 5 (nominal 35 / 30 / 45 mm) | 34.8 / 29.6 / 45.5 mm, mean error −0.05 ± 0.38 mm |
+| Distance of the points from the nominal profile (median / rms) | Corpo 6: 0.55 / 1.09 mm · Corpo 5: 0.62 / 1.07 mm |
+| Peak heights, Corpo 6 (nominal 45 / 25 / 45 mm) | 44.4 / 24.1 / 44.6 mm, mean error −0.67 ± 0.20 mm |
+| Peak heights, Corpo 5 (nominal 35 / 30 / 45 mm) | 34.9 / 29.7 / 45.5 mm, mean error +0.03 ± 0.38 mm |
 | Flank inclination, Corpo 6 | within 3.8° of the drawing (measured 61.6°, 71.9°, 61.2°, 82.8°, 54.8° vs 60°, 70°, 65°, 80°, 55°) |
 | Light plane, error on held-out points | 0.51 mm rms (10% of the points held out) |
-| Camera, reprojection residual | median 1.7 px (about 0.4 mm on the master) |
+| Camera, reprojection residual | median 1.6 px, rms 3.6 px (about 0.4 mm on the master); 9 wrong centres out of 1028 are discarded |
 
 > [!NOTE]
 > Known limits, all visible in the plot above:
 > - The right flank of the first peak of Corpo 6 cannot be measured: it is too steep to be lit by the sheet and seen by the camera.
 > - On Corpo 5 the heights agree, but the central plateau sits about 3–4 mm to the left of the drawing. I have not established whether the cause is the printed part or the scan.
-> - All three heights of Corpo 6 are low (−0.77 mm on average). The same code has no height bias on synthetic data (see below), so the cause is in the real setup or calibration, not in the peak estimator.
+> - All three heights of Corpo 6 are low (−0.67 mm on average). The same code has no height bias on synthetic data (see below), so the cause is in the real setup or calibration, not in the peak estimator.
 > - The camera views at z = 330 and 340 mm have much larger residuals (median 3–7 px) than the others (about 1–1.5 px). A richer per-view pose of the master (adding a height error and a rotation) brings them down to about 1 px, but it made the held-out profile error worse (about 0.5 mm to 0.8 mm), so it is not used. Views beyond the main master are left out of the fit because the setup moved between those shots.
-> - The target view at z = 300 mm used to be dropped because OpenCV's default blob detector rejects the large circles of the "L" when the master is close to the camera. Now that it is detected and used, the median distance on the real scans is about 0.1 mm higher than without it. The synthetic data cannot say which of the two is right; the view is kept because dropping it was an accident of the detector.
+> - The result depends on single views of the master far more than it should: see the sensitivity analysis below.
 
 ## How it works
 
@@ -94,13 +94,29 @@ The synthetic data found four defects, each now covered by a test that fails wit
 - **Centroid of the sheet.** It used only the saturated core, with half a pixel of resolution; it is now weighted by the intensity on the soft edges (median error without noise from 0.10 to 0.03 mm).
 - **Blob detector and profile alignment.** OpenCV's blob detector rejects circles above 5000 px², which dropped the large circles of the "L" when the master was close; and `align` could pick the mirrored profile with 2 px of noise because the vertical error was almost tied. It now decides with the distance in the (y, h) plane. The grid orientation is also fixed from the arms of the "L", since `findCirclesGrid` cannot tell a symmetric grid from its 180° rotation.
 
+## Sensitivity to the calibration
+
+With six views of the master and one scan per solid there is no classical error estimate. [Notebook 5](notebooks/05_uncertainty.ipynb) recalibrates leaving out one view at a time (the view is dropped from both the camera and the light plane) and measures how much the result moves, on the real data and on synthetic data with the same geometry.
+
+![Change in peak heights and in profile error when one view is left out](docs/figures/uncertainty_leave_one_view_out.png)
+
+| Left out | Corpo 6 peak heights | Median distance Corpo 6 / Corpo 5 |
+|---|---|---|
+| none | 44.4 / 24.1 / 44.6 mm | 0.55 / 0.62 mm |
+| z = 300 | 39.9 / 21.5 / 40.1 mm | 1.43 / 1.45 mm |
+| z = 340 | 48.2 / 26.3 / 48.5 mm | 0.73 / 1.85 mm |
+
+On synthetic data no single view moves the heights by more than 0.1 mm, so the sensitivity comes from the setup, not from the algorithm: the real views are not consistent with each other, and the result with all six is a balance between them rather than a robust measurement. Treat the real numbers above as accurate to about 0.5 mm in the best case, not better, and the errors of a single view as large as 4 mm.
+
+The analysis also found a defect: leaving out the view at z = 320 mm halved the camera rms. That view had 9 wrong centres, all in the last column of the master next to the image edge, with residuals of about 67 px (81% of the sum of squared residuals). `calibrate_camera` now discards points whose residual is more than 10 times the median and refits (rms from 7.3 to 3.6 px, median distance from the nominal profile 0.59 to 0.55 mm on Corpo 6).
+
 ## Quick start
 
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or later (developed on 3.15).
 
 ```bash
 uv sync
-uv run pytest        # about 30 s: includes the synthetic end-to-end tests and the regressions on the real images
+uv run pytest        # about 50 s: includes the synthetic end-to-end tests and the regressions on the real images
 ```
 
 The notebooks open with the project kernel (`ipykernel` is a dev dependency), for example from VS Code. JupyterLab is not included: `pyyaml` has no wheel for Python 3.15 yet.
@@ -114,10 +130,10 @@ uv run lightsheet3d scan calibration.json data/scans/30o34.jpg --solid corpo6 --
 
 ```text
 data/scans/30o34.jpg: 1390 points
-  peak 1: y =  -29.9 mm  height  44.3 mm  flanks l/r  61.6° /   nan°
-  peak 2: y =   -7.4 mm  height  23.9 mm  flanks l/r  71.9° /  61.2°
-  peak 3: y =   11.7 mm  height  44.5 mm  flanks l/r  82.8° /  54.8°
-  comparison with Corpo 6: median distance 0.59 mm, 90th percentile 1.63 mm (564 points on the solid)
+  peak 1: y =  -29.9 mm  height  44.4 mm  flanks l/r  61.6° /   nan°
+  peak 2: y =   -7.4 mm  height  24.1 mm  flanks l/r  71.9° /  61.2°
+  peak 3: y =   11.7 mm  height  44.6 mm  flanks l/r  82.8° /  54.8°
+  comparison with Corpo 6: median distance 0.55 mm, 90th percentile 1.52 mm (563 points on the solid)
 ```
 
 `lightsheet3d synthetic DIR --noise 0.5` writes a synthetic dataset with the same layout as `data/`, so the three commands also run on data with a known answer.
@@ -155,13 +171,14 @@ src/lightsheet3d/
   measure.py      profile levelling, heights and angles
   solids.py       nominal profiles, alignment and distance to the measured profile
   report.py       measured vs nominal plot
+  uncertainty.py  leave-one-view-out sensitivity of the result to the calibration
   synthetic.py    synthetic images with known geometry and an end-to-end evaluation
   export.py       PLY export of the measured points
   storage.py      calibration saved to and loaded from JSON
   cli.py          the `lightsheet3d` command
   pipeline.py     from raw images to measurements
 tests/            unit tests, synthetic end-to-end tests and regressions on the real images
-notebooks/        four notebooks with saved outputs (the fourth validates on synthetic data)
+notebooks/        five notebooks with saved outputs (the fourth validates on synthetic data, the fifth measures the sensitivity)
 data/             raw images: camera_calibration, light_plane_calibration, scans
 docs/figures/     figures produced by the notebooks
 ```
@@ -171,9 +188,9 @@ docs/figures/     figures produced by the notebooks
 
 Scanner 3D a triangolazione con telecamera e lama di luce, scritto da zero in Python con NumPy e OpenCV: calibrazione della camera, calibrazione del piano laser e misura in millimetri del profilo di solidi stampati in 3D. Progetto finale del corso *Sistemi di Visione 3D* (Università degli Studi di Brescia, A.A. 2024/25), riscritto come pacchetto testato.
 
-- **Risultati**: distanza mediana dal profilo nominale 0,59 mm (Corpo 6) e 0,68 mm (Corpo 5); altezze dei picchi entro circa 1 mm; piano della lama 0,51 mm rms sui punti esclusi.
+- **Risultati**: distanza mediana dal profilo nominale 0,55 mm (Corpo 6) e 0,62 mm (Corpo 5); altezze dei picchi entro circa 1 mm; piano della lama 0,51 mm rms sui punti esclusi.
 - **Validazione sintetica**: un generatore di immagini con geometria nota misura l'errore dell'algoritmo (0,03 mm mediani senza rumore, 0,64 mm con 2 px di rumore) e ha rivelato quattro difetti (deriva degli offset del master, altezza dei picchi sottostimata di 0,5 mm, baricentro della lama, rilevamento dei cerchi grandi e allineamento specchiato), tutti corretti e coperti da test.
-- **Limiti**: il fianco destro del primo picco del Corpo 6 non è illuminabile; nel Corpo 5 il piano centrale è 3–4 mm a sinistra del disegno, causa non accertata; le tre altezze del Corpo 6 sono basse di 0,77 mm in media (non succede sui dati sintetici); le viste a z = 330 e 340 mm hanno residui alti (3–7 px).
+- **Limiti**: il fianco destro del primo picco del Corpo 6 non è illuminabile; nel Corpo 5 il piano centrale è 3–4 mm a sinistra del disegno, causa non accertata; le tre altezze del Corpo 6 sono basse di 0,67 mm in media (non succede sui dati sintetici); togliendo una sola vista del master le altezze si spostano fino a 4,5 mm sui dati reali e 0,1 mm su quelli sintetici (sensibilità dovuta al setup); le viste a z = 330 e 340 mm hanno residui alti (3–7 px).
 - **Uso**: `uv sync` e `uv run pytest`; i notebook sono in [notebooks/](notebooks/).
 - La traccia e i disegni dei solidi sono materiale del corso (S. Dello Iacono, D. Solinas) e non sono inclusi.
 

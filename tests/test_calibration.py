@@ -4,6 +4,7 @@ from lightsheet3d.calibration import (
     distort_points,
     estimate_projection_matrix,
     fit_camera,
+    fit_camera_robust,
     model_residuals,
     project,
     reprojection_errors,
@@ -110,3 +111,17 @@ def test_residuals_on_held_out_points_stay_within_noise():
 
     assert held_out.shape == ((~train).sum(),)
     assert held_out.mean() < 0.8
+
+
+def test_robust_fit_discards_a_spurious_column_of_centres():
+    world, image, view_ids, _ = make_views()
+    bad = np.zeros(len(world), bool)
+    bad[view_ids == 3] = world[view_ids == 3, 0] == world[view_ids == 3, 0].max()  # ultima colonna di una vista
+    image = image.copy()
+    image[bad] += [60.0, 0.0]  # centri spostati di 60 px, come una colonna rilevata male al bordo
+
+    plain = fit_camera(world, image, view_ids, image_size=(1700, 1240))
+    model, inliers = fit_camera_robust(world, image, view_ids, image_size=(1700, 1240))
+
+    assert bad.sum() > 5 and not inliers[bad].any() and inliers[~bad].all()
+    assert model.rms < 0.6 < plain.rms

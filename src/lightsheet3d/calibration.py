@@ -135,3 +135,20 @@ def model_residuals(model, world, image, view_ids):
     shifted[:, :2] += model.offsets[np.searchsorted(model.views, view_ids)]
     predicted = distort_points(project(model.P, shifted), model.center, model.k)
     return np.linalg.norm(predicted - np.asarray(image, np.float64).reshape(-1, 2), axis=1)
+
+
+def fit_camera_robust(world, image, view_ids, image_size, outlier_factor=10.0, **kwargs):
+    """`fit_camera` con un secondo passo che scarta i centri sbagliati; ritorna (modello, inliers).
+
+    Un centro rilevato male (per esempio una colonna spuria al bordo dell'immagine) può avere
+    decine di pixel di residuo: la perdita robusta lo attenua ma non lo annulla. Si scartano i punti
+    con residuo oltre `outlier_factor` volte la mediana e si rifà il fit sugli altri.
+    """
+    world = np.asarray(world, np.float64)
+    image = np.asarray(image, np.float64).reshape(-1, 2)
+    model = fit_camera(world, image, view_ids, image_size, **kwargs)
+    residuals = model_residuals(model, world, image, view_ids)
+    inliers = residuals <= outlier_factor * np.median(residuals)
+    if not inliers.all():
+        model = fit_camera(world[inliers], image[inliers], np.asarray(view_ids)[inliers], image_size, **kwargs)
+    return model, inliers
