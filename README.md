@@ -63,6 +63,7 @@ What did not help on the held-out scans: dropping the inconsistent views (330 an
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or later (developed on 3.15).
 
 ```bash
+git clone https://github.com/SickCiQuattro/lightsheet3d.git && cd lightsheet3d
 uv sync
 uv run pytest        # about 2 minutes: synthetic end-to-end tests and regressions on the real images
 ```
