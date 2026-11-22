@@ -66,7 +66,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or later (developed on
 
 ```bash
 uv sync
-uv run pytest        # about 45 s: includes the regressions on the real images
+uv run pytest        # about 20 s: includes the regressions on the real images
 ```
 
 The notebooks open with the project kernel (`ipykernel` is a dev dependency), for example from VS Code. JupyterLab is not included: `pyyaml` has no wheel for Python 3.15 yet.
