@@ -1,9 +1,8 @@
 name: CI
 
+# Solo manuale: gh workflow run CI. Niente push/pull_request finché i minuti di GitHub Actions non sono di nuovo disponibili.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
