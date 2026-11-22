@@ -31,8 +31,7 @@ def test_peak_heights_and_positions():
 
     peaks = measure_peaks(y, h)
 
-    # l'apice cade fra due campioni: errore fino a ~0.5 mm sui fianchi ripidi
-    assert np.allclose([p.height for p in peaks], [45, 35], atol=0.8)
+    assert np.allclose([p.height for p in peaks], [45, 35], atol=0.3)
     assert abs(peaks[0].y - y1) < 1.0 and abs(peaks[1].y - y4) < 1.0
 
 
@@ -73,3 +72,28 @@ def test_jittery_vertical_edge_is_a_single_peak():
     y, h = np.concatenate([y, edge_y]), np.concatenate([h, edge_h])
 
     assert len(measure_peaks(y, h, prominence=6)) == 1
+
+
+def sharp_peak(apex=45.0, cut=0.0, left=60.0, right=75.0, step=0.1):
+    """Picco con apice troncato di `cut` mm, come fa il baricentro della lama su una cima acuta."""
+    y = np.arange(-80, 80, step)
+    h = np.clip(np.minimum(apex + y * np.tan(np.radians(left)), apex - y * np.tan(np.radians(right))), 0, None)
+    return y, np.minimum(h, apex - cut)
+
+
+def test_truncated_sharp_apex_is_recovered_from_the_flanks():
+    y, h = sharp_peak(apex=45.0, cut=0.8)
+
+    (peak,) = measure_peaks(y, h, prominence=6)
+
+    assert abs(peak.height - 45.0) < 0.25  # il massimo grezzo darebbe 44.2
+
+
+def test_flat_top_height_is_not_inflated_by_the_flank_intersection():
+    y = np.arange(-60, 60, 0.1)
+    h = np.clip(np.minimum.reduce([35 + (y + 4) * np.tan(np.radians(65)), 35 - (y - 4) * np.tan(np.radians(65)),
+                                   np.full_like(y, 35.0)]), 0, None)  # piano largo 8 mm
+
+    (peak,) = measure_peaks(y, h, prominence=6)
+
+    assert abs(peak.height - 35.0) < 0.2  # i fianchi si incrociano molto più in alto del piano

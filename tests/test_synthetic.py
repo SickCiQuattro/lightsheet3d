@@ -33,12 +33,18 @@ def test_clean_light_plane_matches_the_true_one(clean):
 
 def test_clean_profile_matches_the_ground_truth(clean):
     assert clean["sign"] == 1 and clean["shift"] == pytest.approx(TRUE_SHIFT, abs=0.5)
-    assert np.median(clean["dist"]) < 0.15
+    assert np.median(clean["dist"]) < 0.06
     heights = [p.height for p in measure_peaks(clean["y"], clean["h"], prominence=6, min_separation=10)]
-    # i picchi acuti sono sottostimati di circa 0.5 mm (filtro mediano e campionamento della lama)
-    assert np.allclose(heights, [45, 25.05, 45], atol=0.7) and all(m < t for m, t in zip(heights, [45, 25.05, 45]))
+    assert np.allclose(heights, [45, 25.05, 45], atol=0.15)  # senza stima dell'apice erano sottostimati di ~0.5 mm
 
 
 def test_half_pixel_noise_keeps_the_error_below_half_a_millimetre(noisy):
     assert noisy["sign"] == 1 and noisy["shift"] == pytest.approx(TRUE_SHIFT, abs=1.0)
     assert np.median(noisy["dist"]) < 0.5
+
+
+def test_two_pixel_noise_does_not_flip_the_profile(tmp_path):
+    # con questo seed lo scarto verticale era quasi pari fra l'allineamento giusto e quello speculare
+    result = evaluate(CORPO6, tmp_path, noise_px=2.0, seed=2)
+
+    assert result["sign"] == 1 and result["shift"] == pytest.approx(TRUE_SHIFT, abs=1.5)

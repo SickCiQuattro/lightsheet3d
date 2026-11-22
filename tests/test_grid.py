@@ -6,15 +6,16 @@ from lightsheet3d.grid import (
     build_object_points,
     find_first_valid_circles_grid,
     find_origin_index,
+    orient_grid,
 )
 
 
-def synthetic_grid(cols, rows, step=60, radius=12, margin=80, big=()):
+def synthetic_grid(cols, rows, step=60, radius=12, margin=80, big=(), big_radius=19):
     """Griglia di cerchi; i (col, riga) in `big` hanno raggio maggiore."""
     img = np.full((rows * step + 2 * margin, cols * step + 2 * margin), 255, np.uint8)
     for r in range(rows):
         for c in range(cols):
-            rad = 19 if (c, r) in big else radius
+            rad = big_radius if (c, r) in big else radius
             cv.circle(img, (margin + c * step, margin + r * step), rad, 0, -1)
     return img
 
@@ -75,3 +76,32 @@ def test_object_points_are_centred_on_origin_with_known_pitch_and_height():
     assert np.allclose(obj[27], [0, 0, 300])
     assert np.allclose(obj[28] - obj[27], [20, 0, 0])
     assert np.allclose(obj[39] - obj[27], [0, 20, 0])
+
+
+def test_finds_the_grid_when_the_large_circles_exceed_the_default_blob_area():
+    # il master vicino alla camera: i tre cerchi grandi superano i 5000 px² del rilevatore di OpenCV
+    img = synthetic_grid(cols=8, rows=6, step=160, radius=30, margin=150, big={(2, 2), (5, 2), (2, 4)}, big_radius=45)
+
+    pattern, _ = find_first_valid_circles_grid(img, max_cols=9, max_rows=7, min_size=6)
+
+    assert pattern == (8, 6)
+
+
+@pytest.mark.parametrize("rotate", [False, True])
+def test_orient_grid_puts_the_l_arms_toward_increasing_columns_and_rows(rotate):
+    # "L" con origine in (col 3, riga 2): bracci lunghi 3 colonne e 2 righe
+    big = {(3, 2), (6, 2), (3, 4)}
+    img = synthetic_grid(cols=10, rows=8, step=70, radius=13, margin=90, big=big)
+    if rotate:
+        img = cv.rotate(img, cv.ROTATE_180)  # findCirclesGrid restituisce i centri in un altro ordine
+
+    pattern, centers = find_first_valid_circles_grid(img, max_cols=10, max_rows=8, min_size=8)
+    centers, origin = orient_grid(img, pattern, centers)
+
+    # i tre cerchi grandi cadono nei punti dell'immagine in cui sono disegnati, qualunque sia l'ordine dei centri
+    def pixel(col, row):
+        xy = np.array([90 + col * 70, 90 + row * 70], float)
+        return np.array(img.shape[::-1], float) - xy if rotate else xy
+
+    cols, _ = pattern
+    assert np.allclose(centers[[origin, origin + 3, origin + 2 * cols]], [pixel(3, 2), pixel(6, 2), pixel(3, 4)], atol=1.5)

@@ -22,14 +22,44 @@ def level_to_plate(y, h, tolerances=(5.0, 2.0, 1.5)):
     return h - np.polyval(line, y)
 
 
-def _flank_angle(y, h, y_range, h_range):
-    """Inclinazione (gradi) del fianco: retta ai minimi quadrati totali sui punti nella finestra."""
+def _flank_line(y, h, y_range, h_range):
+    """Retta ai minimi quadrati totali sui punti del fianco nella finestra: (punto medio, direzione) o None."""
     inside = (y >= y_range[0]) & (y <= y_range[1]) & (h >= h_range[0]) & (h <= h_range[1])
     if inside.sum() < 5:
-        return float("nan")
+        return None
     pts = np.column_stack([y[inside], h[inside]])
-    direction = np.linalg.svd(pts - pts.mean(axis=0))[2][0]
-    return float(np.degrees(np.arctan2(abs(direction[1]), abs(direction[0]))))
+    return pts.mean(axis=0), np.linalg.svd(pts - pts.mean(axis=0))[2][0]
+
+
+def _angle(line):
+    """Inclinazione (gradi) rispetto all'orizzontale di una retta (punto, direzione); nan se manca."""
+    return float("nan") if line is None else float(np.degrees(np.arctan2(abs(line[1][1]), abs(line[1][0]))))
+
+
+def _apex_height(y, h, y_peak, h_peak, left, right, plateau=3.0, tip=0.6, reach=3.0, lift=4.0):
+    """Altezza di un picco dal profilo grezzo (y, h), che nell'apice è sempre troncato.
+
+    La lama ha spessore e il baricentro per riga taglia la cima: un picco acuto si stima con
+    l'intersezione delle rette dei due fianchi, un piano largo (più di `plateau` mm entro `tip` mm
+    dalla cima) con la mediana dei suoi punti. Se un fianco non è misurabile, o l'intersezione cade
+    lontano dal picco, si ripiega sul massimo dei punti vicini.
+    """
+    near = np.abs(y - y_peak) <= 6.0
+    top = near & (h >= h[near].max() - tip)
+    if np.ptp(y[top]) >= plateau:
+        return float(np.median(h[top]))
+    fallback = float(h[np.abs(y - y_peak) <= 1.0].max())
+    if left is None or right is None:
+        return fallback
+    (p, d), (q, e) = left, right
+    cross = d[0] * e[1] - d[1] * e[0]
+    if abs(cross) < 1e-6:
+        return fallback
+    t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / cross
+    apex = p + t * d
+    if abs(apex[0] - y_peak) > reach or not h_peak - 1.0 <= apex[1] <= h_peak + lift:
+        return fallback
+    return float(apex[1])
 
 
 def measure_peaks(y, h, prominence=8.0, min_separation=5.0, band=(0.25, 0.75), reach=60.0):
@@ -59,9 +89,10 @@ def measure_peaks(y, h, prominence=8.0, min_separation=5.0, band=(0.25, 0.75), r
         left_base, right_base = (smooth[valleys[k - 1]] if k else floor), (smooth[valleys[k]] if k < len(valleys) else floor)
         left_limit = y[valleys[k - 1]] if k else y[i] - reach
         right_limit = y[valleys[k]] if k < len(valleys) else y[i] + reach
-        angles = []
+        lines = []
         for base, limits in ((left_base, (left_limit, y[i])), (right_base, (y[i], right_limit))):
             rise = smooth[i] - base
-            angles.append(_flank_angle(y, h, limits, (smooth[i] - band[1] * rise, smooth[i] - band[0] * rise)))
-        peaks.append(Peak(float(y[i]), float(smooth[i]), *angles))
+            lines.append(_flank_line(y, h, limits, (smooth[i] - band[1] * rise, smooth[i] - band[0] * rise)))
+        height = _apex_height(y, h, y[i], smooth[i], *lines)
+        peaks.append(Peak(float(y[i]), height, _angle(lines[0]), _angle(lines[1])))
     return peaks

@@ -21,7 +21,7 @@ def calibration():
 def test_camera_uses_only_views_up_to_the_main_target(calibration):
     camera, _ = calibration
 
-    assert sorted(set(camera.view_ids)) == [310, 320, 330, 340, 350]
+    assert sorted(set(camera.view_ids)) == [300, 310, 320, 330, 340, 350]  # 300 era scartata dal blob detector di default
     assert camera.model.rms < 10
 
 

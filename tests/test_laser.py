@@ -52,3 +52,14 @@ def test_returns_empty_array_when_no_laser():
     img = np.full((50, 50, 3), 120, np.uint8)
 
     assert laser_centroids(img).shape == (0, 2)
+
+
+def test_centroid_is_subpixel_on_a_blurred_stripe():
+    cols = np.arange(300)
+    profile = np.clip(80 + 300 * np.exp(-((cols - 100.3) ** 2) / (2 * 2.5**2)), 0, 255)  # nucleo saturo, bordi sfumati
+    img = np.repeat(np.tile(profile, (400, 1))[..., None], 3, axis=2).astype(np.uint8)
+
+    uv = laser_centroids(img)
+
+    assert len(uv) == 400
+    assert np.abs(uv[:, 0] - 100.3).max() < 0.1  # la media del solo nucleo saturo darebbe 100.0
