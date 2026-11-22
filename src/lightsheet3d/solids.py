@@ -40,7 +40,7 @@ def _load():
 
 
 SOLIDS = _load()
-CORPO1, CORPO2, CORPO3, CORPO4, CORPO5, CORPO6 = (SOLIDS[f"corpo{n}"] for n in range(1, 7))
+CORPO1, CORPO2, CORPO3, CORPO4, CORPO5, CORPO6, CORPO7 = (SOLIDS[f"corpo{n}"] for n in range(1, 8))
 
 
 def align(solid, y, h, clip=5.0, step=0.1, candidates=4, refine=1.0):

@@ -12,7 +12,7 @@ def test_the_shipped_dataset_describes_the_lab_images():
 
     assert ds.image_size == (2130, 1420) and ds.pitch_mm == 20.0 and ds.plate_z == ds.reference_z == 350.0
     assert ds.target_path == REPO / "data" / "camera_calibration"
-    assert len(ds.entries()) == 14 and {e.role for e in ds.entries()} == {"dev", "test"}
+    assert len(ds.entries()) == 16 and {e.role for e in ds.entries()} == {"dev", "test"}
     assert all((ds.scans_path / e.file).exists() for e in ds.entries())
 
 

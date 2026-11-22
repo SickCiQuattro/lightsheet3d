@@ -9,6 +9,9 @@ half a line width per side (about 0.04 mm in total), so it is scaled isotropical
 width; the isotropic scale also corrects Corpo 4, drawn at 2:1. The depth is the height of the
 top view, at the same scale.
 
+Corpo 7 has a stepped bore and its section is hatched, not filled, so there is no vector profile to read: it is
+built from the dimensions of the drawing (`corpo7`), as the section through the axis of the bore.
+
 Usage: python scripts/extract_drawing_profiles.py PDF_FOLDER src/lightsheet3d/profiles.json
 Requires pdftocairo (poppler).
 """
@@ -87,6 +90,19 @@ def extract(svg, width):
     return outline.astype(float), float(np.ptp(top[:, 1]) * scale)
 
 
+def corpo7():
+    """(outline, depth) of the section of Corpo 7 through the axis of the bore, from the dimensions of the drawing.
+
+    75 x 45 mm; R10 on the top left; chamfer at 135 deg from (60, 45) to (75, 30); bore on the axis x = 35 of
+    diameters 35, 24 and 12 mm, 10, 10 and 15 mm deep. A sheet that crosses the bore off-axis sees narrower steps.
+    """
+    t = np.linspace(np.pi, np.pi / 2, 41)[1:]
+    arc = np.column_stack([10 + 10 * np.cos(t), 35 + 10 * np.sin(t)])
+    bore = [(17.5, 45), (17.5, 35), (23, 35), (23, 25), (29, 25), (29, 10), (41, 10), (41, 25), (47, 25), (47, 35),
+            (52.5, 35), (52.5, 45)]
+    return np.vstack([[0, 0], [0, 35], arc, bore, [60, 45], [75, 30], [75, 0]]), 50.0
+
+
 def main(pdf_dir, output):
     profiles = {}
     with tempfile.TemporaryDirectory() as tmp:
@@ -97,6 +113,8 @@ def main(pdf_dir, output):
             profiles[f"corpo{number}"] = {"name": f"Corpo {number}", "depth": round(depth, 2),
                                           "outline": np.round(outline, 3).tolist()}
             print(f"Corpo {number}: {len(outline)} vertices, height {outline[:, 1].max():.2f} mm, depth {depth:.2f} mm")
+    outline, depth = corpo7()
+    profiles["corpo7"] = {"name": "Corpo 7", "depth": depth, "outline": np.round(outline, 3).tolist()}
     Path(output).write_text(json.dumps(profiles, separators=(",", ":")) + "\n")
 
 

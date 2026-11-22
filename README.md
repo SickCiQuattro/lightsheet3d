@@ -5,7 +5,7 @@ A 3D scanner built from a camera and a laser light sheet, written from scratch i
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![One scan of each of the six solids, measured (red) over the profile from the drawing (dashed)](docs/figures/heldout_profiles.png)
+![One scan of each of the seven solids, measured (red) over the profile from the drawing (dashed)](docs/figures/heldout_profiles.png)
 
 *One held-out scan per solid.*
 
@@ -15,12 +15,12 @@ Final project of the *3D Vision Systems* course (University of Brescia, 2024/25)
 
 The lab images have a heavily distorted lens and a setup that moved during the session, so the numbers below are those of that setup, measured honestly.
 
-Fourteen of the 33 scans match one of the six solids whose drawings I have ([data/scans.csv](data/scans.csv)). Two of them (a Corpo 5 and a Corpo 6) are the ones I used to choose and tune the algorithms, so their error is optimistic: they are marked `dev`. The other twelve, covering all six solids, had no part in any choice and are the real test.
+Sixteen of the 33 scans match one of the seven solids whose drawings I have ([data/scans.csv](data/scans.csv)). Two of them (a Corpo 5 and a Corpo 6) are the ones I used to choose and tune the algorithms, so their error is optimistic: they are marked `dev`. The other fourteen, covering all seven solids, had no part in any choice and are the real test.
 
 | Scans | Median distance of the points from the drawing | Peak heights (measured − nominal) |
 |---|---|---|
-| 12 held-out `test` scans | **0.91 mm** on average, 1.54 mm at worst | −0.15 mm on average, 0.75 mm rms |
-| same, allowing a skewed placement (below) | **0.79 mm** on average, 1.31 mm at worst | |
+| 14 held-out `test` scans | **0.87 mm** on average, 1.54 mm at worst | −0.15 mm on average, 0.75 mm rms |
+| same, allowing a skewed placement (below) | **0.77 mm** on average, 1.31 mm at worst | |
 | 2 `dev` scans | 0.58 mm | −0.33 mm on average, 0.58 mm rms |
 
 ![Median error of each scan, with and without the stretch for a skewed placement](docs/figures/heldout_scans.png)
@@ -33,12 +33,13 @@ Fourteen of the 33 scans match one of the six solids whose drawings I have ([dat
 | Corpo 4 (staircase) | 2 | 1.01 mm | 0.79 mm |
 | Corpo 5 | 2 (1 `dev`) | 0.90 mm | 0.96 mm |
 | Corpo 6 | 2 (1 `dev`) | 0.81 mm | 0.74 mm |
+| Corpo 7 (stepped bore) | 2 | 0.62 mm | 0.62 mm |
 
 Other calibration figures: the light plane has 0.51 mm rms error on held-out points, and the camera 1.6 px median reprojection residual (3.6 px rms; 9 wrong centres out of 1028 are discarded).
 
 > [!NOTE]
 > How far to trust these numbers:
-> - **The solids were recognised automatically.** For each scan I took the nominal profile with the smallest distance and kept those below 1.6 mm with at least 150 points on the solid, which biases the error low. The other 19 scans match none of the six profiles (probably the seventh solid, which has a bore, or poses outside the measuring plane) and are not used.
+> - **The solids were recognised automatically.** For each scan I took the nominal profile with the smallest distance and kept those below 1.6 mm with at least 150 points on the solid, which biases the error low. The other 17 scans match none of the seven profiles (boxes, poses outside the measuring plane, or a sheet that crosses the bore of Corpo 7 off its axis, so the steps are narrower than in the section) and are not used.
 > - **The drawings are the ground truth, and the solids are 3D printed.** FDM parts deviate from their drawing by about 0.2–0.3 mm on their own.
 > - **A skewed placement is a real effect.** A solid laid across the sheet is cut obliquely and its profile is stretched along Y by 1/cos(angle). With `oblique=True` the nominal profile may stretch, and the stretch found is always reported. For the scans where the solid is aligned with the sheet it comes out at 1.00, which is an independent check that the Y scale of the calibration (the 20 mm pitch of the master) is right within about 1%; for the others it is 1.07–1.33, a tilt of 20–40 degrees. It gets worse on one scan (`30o5`), where the pose is more complex than a rotation.
 > - **Some features cannot be measured.** Flanks that are too steep are not lit by the sheet and seen by the camera, so they leave gaps.
@@ -165,7 +166,7 @@ Each scan is the 3D curve where the sheet meets the solid. It lies on the plane 
 
 ## Nominal profiles
 
-`lightsheet3d.solids` holds the profile of each solid. They are read from the technical drawings: the front view is a filled vector path in the PDF, which `pdftocairo` converts to SVG, so the vertices (arcs included) are exact; [scripts/extract_drawing_profiles.py](scripts/extract_drawing_profiles.py) regenerates [profiles.json](src/lightsheet3d/profiles.json) from a folder of the PDFs. The profiles of Corpo 5 and Corpo 6, first built by hand from the dimensions, agree with the extracted ones within 0.03 mm, and the tests check it. Corpo 7, which has a stepped bore, is not included.
+`lightsheet3d.solids` holds the profile of each solid. They are read from the technical drawings: the front view is a filled vector path in the PDF, which `pdftocairo` converts to SVG, so the vertices (arcs included) are exact; [scripts/extract_drawing_profiles.py](scripts/extract_drawing_profiles.py) regenerates [profiles.json](src/lightsheet3d/profiles.json) from a folder of the PDFs. The profiles of Corpo 5 and Corpo 6, first built by hand from the dimensions, agree with the extracted ones within 0.03 mm, and the tests check it. Corpo 7, whose hatched section has no vector profile, is built from the dimensions of the drawing as the section through the axis of its bore (it is only exact if the sheet crosses the axis).
 
 The scan frame is arbitrary, so `align` finds the shift and direction that put the nominal profile best on the measured points, and `distances` measures each point's distance to it in the (y, h) plane, which does not inflate errors on steep flanks.
 
@@ -268,7 +269,7 @@ docs/             figures and an example point cloud
 
 Scanner 3D a triangolazione con telecamera e lama di luce, scritto da zero in Python con NumPy e OpenCV: calibrazione della camera, calibrazione del piano laser e misura in millimetri del profilo di solidi stampati in 3D. Progetto finale del corso *Sistemi di Visione 3D* (Università degli Studi di Brescia, A.A. 2024/25), riscritto come pacchetto testato con una CLI.
 
-- **Risultati onesti**: 14 delle 33 scansioni corrispondono a uno dei sei solidi di cui ho il disegno. Due (Corpo 5 e Corpo 6) hanno guidato le scelte di algoritmo e sono ottimistiche (0,58 mm); le altre 12, su tutti e sei i solidi, sono il vero test: distanza mediana dal disegno **0,91 mm** (0,79 mm se si ammette un solido posato di traverso rispetto alla lama).
+- **Risultati onesti**: 16 delle 33 scansioni corrispondono a uno dei sette solidi di cui ho il disegno. Due (Corpo 5 e Corpo 6) hanno guidato le scelte di algoritmo e sono ottimistiche (0,58 mm); le altre 14, su tutti e sette i solidi, sono il vero test: distanza mediana dal disegno **0,87 mm** (0,77 mm se si ammette un solido posato di traverso rispetto alla lama).
 - **Cosa limita la precisione**: la triangolazione è debole (0,79 px per mm di quota, quindi 1 px = 1,27 mm; l'errore sui test vale circa 0,7 px); il banco si è mosso durante l'acquisizione (la linea sul piano si sposta fino a circa 2 mm); la calibrazione è fragile alle singole viste (fino a 4,5 mm sui dati reali, 0,1 mm su quelli sintetici).
 - **Validazione sintetica**: un generatore di immagini con geometria nota ha trovato difetti reali (deriva degli offset, altezza dei picchi sottostimata di 0,5 mm, baricentro della lama, rilevamento dei cerchi grandi, allineamento specchiato), tutti corretti e coperti da test.
 - **Uso**: `uv sync`; `uv run lightsheet3d calibrate data/dataset.toml`, poi `scan` e `evaluate`. Un dataset si descrive con un `dataset.toml` (cartelle, passo del master, quote dai nomi dei file).

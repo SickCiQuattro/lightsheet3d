@@ -34,15 +34,15 @@ def real():
     return evaluate(Calibration.fit(dataset), dataset)
 
 
-def test_real_scans_of_all_six_solids_are_measured(real):
-    assert len(real) == 14 and {r.solid for r in real} == {f"corpo{n}" for n in range(1, 7)}
+def test_real_scans_of_all_seven_solids_are_measured(real):
+    assert len(real) == 16 and {r.solid for r in real} == {f"corpo{n}" for n in range(1, 8)}
 
 
 def test_error_on_the_held_out_scans_stays_below_a_millimetre_and_a_half(real):
-    # the 12 "test" scans did not guide any algorithm choice; the current values are 0.91 mm on average, 1.54 at worst
+    # the 14 "test" scans did not guide any algorithm choice; the current values are 0.87 mm on average, 1.54 at worst
     summary = summarize(real)["test"]
 
-    assert summary["scans"] == 12 and summary["median"] < 1.1 and summary["worst"] < 1.8
+    assert summary["scans"] == 14 and summary["median"] < 1.1 and summary["worst"] < 1.8
 
 
 def test_allowing_the_oblique_stretch_lowers_the_held_out_error(real):
@@ -50,6 +50,6 @@ def test_allowing_the_oblique_stretch_lowers_the_held_out_error(real):
     oblique = evaluate(Calibration.fit(dataset), dataset, oblique=True)
     plain, stretched = summarize(real)["test"]["median"], summarize(oblique)["test"]["median"]
 
-    assert stretched < plain - 0.05 and stretched < 0.95  # 0.91 -> 0.80 mm today
+    assert stretched < plain - 0.05 and stretched < 0.95  # 0.87 -> 0.77 mm today
     # where the solid is aligned with the sheet the parameter must stay close to 1: the calibration's Y scale is right
     assert [r.scale for r in oblique if r.file in ("30o31.jpg", "30o33.jpg", "30o7.jpg", "30o12.jpg")] == pytest.approx([1.0] * 4, abs=0.03)

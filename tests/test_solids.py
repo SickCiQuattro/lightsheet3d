@@ -12,6 +12,7 @@ from lightsheet3d.solids import (
     CORPO4,
     CORPO5,
     CORPO6,
+    CORPO7,
     SOLIDS,
     align,
     align_oblique,
@@ -74,8 +75,15 @@ def test_corpo1_matches_the_staircase_and_the_slope_read_from_the_drawing():
     assert np.allclose(CORPO1.outline, expected, atol=0.03)  # slope 1:2, dimensioned angle 116.57 degrees
 
 
-def test_solid_registry_lists_the_six_profiles():
-    assert sorted(SOLIDS) == [f"corpo{n}" for n in range(1, 7)]
+def test_solid_registry_lists_the_seven_profiles():
+    assert sorted(SOLIDS) == [f"corpo{n}" for n in range(1, 8)]
+
+
+def test_corpo7_matches_the_quoted_dimensions_and_the_bore_is_stepped():
+    assert CORPO7.width == 75 and CORPO7.outline[:, 1].max() == 45
+    h = lambda x: float(np.interp(x, *CORPO7.outline.T))
+    assert [h(x) for x in (35, 26, 20, 12, 56, 74.9)] == pytest.approx([10, 25, 35, 45, 45, 30.1], abs=0.01)  # axis, Ø12, Ø24, Ø35 steps, top, chamfer end
+    assert [round(h) for _, h in CORPO7.peaks()] == [45, 45]  # the two shoulders around the bore
 
 
 def test_corpo6_matches_the_quoted_dimensions():
