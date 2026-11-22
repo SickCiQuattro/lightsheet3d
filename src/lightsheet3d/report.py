@@ -12,13 +12,13 @@ def compare_profile(ax, solid, y, h, peaks):
     on_solid = (y > yn[1]) & (y < yn[-2])
     d = distances(solid, sign, shift, y[on_solid], h[on_solid])
 
-    ax.plot(yn, hn, "k--", lw=1.2, label="profilo nominale (disegno)")
-    ax.plot(y, h, "r.", ms=2, label="punti misurati")
+    ax.plot(yn, hn, "k--", lw=1.2, label="nominal profile (drawing)")
+    ax.plot(y, h, "r.", ms=2, label="measured points")
     nominal_peaks = sorted((sign * x + shift, height) for x, height in solid.peaks())
     for p, (_, nominal) in zip(sorted(peaks, key=lambda p: p.y), nominal_peaks):
-        ax.annotate(f"{p.height:.1f} mm\n(nominale {nominal:.1f}, {p.height - nominal:+.1f})",
+        ax.annotate(f"{p.height:.1f} mm\n(nominal {nominal:.1f}, {p.height - nominal:+.1f})",
                     (p.y, p.height), textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8)
-    ax.set(xlabel="Y (mm)", ylabel="altezza dal piano di appoggio (mm)", title=solid.name, ylim=(-5, 62))
+    ax.set(xlabel="Y (mm)", ylabel="height above the support plane (mm)", title=solid.name, ylim=(-5, 62))
     ax.legend(loc="upper right")
     return {"sign": sign, "shift": shift, "median": float(np.median(d)), "points": int(on_solid.sum()),
             "rms": float(np.sqrt((d**2).mean())), "p90": float(np.percentile(d, 90))}
@@ -47,6 +47,6 @@ def scan_3d(ax, solid, X, h, sign, shift, vmax=2.0):
     ax.plot(np.full_like(grid_y, grid_x[0]), grid_y, surface, color="0.4", lw=0.8)  # front edge, to read the shape
     on_solid = (y > yn[1] - 2) & (y < yn[-2] + 2)
     ax.scatter(X[on_solid, 0], y[on_solid], h[on_solid], c=distance_colors(dist[on_solid], vmax) / 255, s=7, depthshade=False)
-    ax.set(xlabel="X (mm)", ylabel="Y (mm)", zlabel="altezza (mm)", ylim=(yn[1] - 5, yn[-2] + 5), zlim=(0, 55))
+    ax.set(xlabel="X (mm)", ylabel="Y (mm)", zlabel="height (mm)", ylim=(yn[1] - 5, yn[-2] + 5), zlim=(0, 55))
     ax.set_box_aspect((solid.depth / 2, yn[-2] - yn[1] + 10, 55 * 1.4))
     return dist

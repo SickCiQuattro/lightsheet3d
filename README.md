@@ -7,7 +7,7 @@ A 3D scanner built from a camera and a laser light sheet, written from scratch i
 
 ![One scan of each of the six solids, measured (red) over the profile from the drawing (dashed)](docs/figures/heldout_profiles.png)
 
-*One held-out scan per solid. Plot labels are in Italian.*
+*One held-out scan per solid.*
 
 Final project of the *3D Vision Systems* course (University of Brescia, 2024/25), rewritten as a package with a command line, unit tests, regressions on the real images and executed notebooks.
 

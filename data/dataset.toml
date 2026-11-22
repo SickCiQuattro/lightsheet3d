@@ -1,5 +1,5 @@
-# Laboratorio di Sistemi di Visione 3D, Università di Brescia, A.A. 2024/25.
-# z (mm) di un'immagine di taratura = prime due cifre del nome * z_scale + z_offset (26.jpg -> 310).
+# 3D Vision Systems Lab, University of Brescia, academic year 2024/25.
+# z (mm) of a calibration image = first two digits of the file name * z_scale + z_offset (26.jpg -> 310).
 image_size = [2130, 1420]
 pitch_mm = 20.0
 pattern_max = [21, 14]
