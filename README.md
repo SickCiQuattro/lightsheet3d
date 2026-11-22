@@ -125,6 +125,15 @@ On synthetic data no single view moves the heights by more than 0.1 mm, so the s
 
 The analysis also found a defect: leaving out the view at z = 320 mm halved the camera rms. That view had 9 wrong centres, all in the last column of the master next to the image edge, with residuals of about 67 px (81% of the sum of squared residuals). `calibrate_camera` now discards points whose residual is more than 10 times the median and refits (rms from 7.3 to 3.6 px, median distance from the nominal profile 0.59 to 0.55 mm on Corpo 6).
 
+## Tried and not adopted
+
+Each of these was measured against the synthetic data and the sensitivity analysis before deciding.
+
+- **Joint estimate of camera and light plane** ([experiments/joint_calibration.py](experiments/joint_calibration.py)). The two calibration steps are merged: the circle reprojection and the distance of the sheet points from the plane are minimised together, so the sheet also constrains the projection matrix. On synthetic data it is indistinguishable from the two-step estimate (median distance 0.344 against 0.352 mm at 1 px of noise, 0.646 against 0.642 mm at 2 px). On the real data it improves Corpo 6 (0.55 to 0.47 mm) and worsens Corpo 5 (0.62 to 0.91 mm), raises the peak heights by about 1.4 mm, and leaves the dependence on single views almost unchanged (leaving out z = 300 still lowers the heights by 3.5 mm, against 4.6 mm with two steps). It adds parameters and a weight between pixels and millimetres for no demonstrable gain.
+- **A richer pose of the master in each view** (a height error and a rotation, besides the lateral shift). The residuals of every view fall to about 1 px, but the profile error on the real scans rose from about 0.5 to 0.8 mm, so the camera fits better and the measurement gets worse. The code was not kept.
+- **More radial distortion coefficients.** With three, Corpo 6 improves (0.53 to 0.38 mm) and Corpo 5 worsens (0.69 to 0.74 mm); with four it worsens further. Two are kept.
+- **Steger's method as the default** (see above): better on blurred, noisy synthetic images, no gain on the real ones.
+
 ## Quick start
 
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or later (developed on 3.15).
@@ -193,6 +202,7 @@ src/lightsheet3d/
   cli.py          the `lightsheet3d` command
   pipeline.py     from raw images to measurements
 tests/            unit tests, synthetic end-to-end tests and regressions on the real images
+experiments/      experiments that were measured and not adopted
 notebooks/        five notebooks with saved outputs (the fourth validates on synthetic data, the fifth measures the sensitivity)
 data/             raw images: camera_calibration, light_plane_calibration, scans
 docs/figures/     figures produced by the notebooks
