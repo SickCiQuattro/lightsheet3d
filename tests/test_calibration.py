@@ -11,9 +11,9 @@ from lightsheet3d.calibration import (
     undistort_points,
 )
 
-# Scena sintetica con la geometria del setup reale: z è la distanza lungo
-# l'asse ottico, i piani stanno a z = 300..350 mm e la telecamera è a z ~ 38 mm,
-# quindi l'origine del mondo sta dietro il piano camera (profondità < 0).
+# Synthetic scene with the geometry of the real setup: z is the distance along
+# the optical axis, the planes are at z = 300..350 mm and the camera is at z ~ 38 mm,
+# so the world origin lies behind the camera plane (depth < 0).
 K = np.array([[1250.0, 0, 590], [0, 1250.0, 410], [0, 0, 1]])
 R = np.eye(3)
 CAMERA = np.array([1.0, 168.0, 38.0])
@@ -38,7 +38,7 @@ def test_recovers_projection_from_float32_points():
 
 
 def test_noisy_points_reproject_within_noise():
-    # con m12 = 1 (profondità positiva all'origine) l'errore qui sale a ~1.5 px
+    # with m12 = 1 (positive depth at the origin) the error here rises to ~1.5 px
     world, image = make_points()
     noisy = image + np.random.default_rng(0).normal(0, 2.0, image.shape)
 
@@ -56,18 +56,18 @@ def test_projection_matrix_is_normalised_with_points_in_front():
     assert (np.hstack([world, np.ones((len(world), 1))]) @ P[2] > 0).all()
 
 
-# --- modello congiunto: P + distorsione radiale + offset laterale per vista ---
+# --- joint model: P + radial distortion + lateral offset per view ---
 CENTER = np.array([850.0, 620.0])
 K_RADIAL = np.array([-0.10, 0.008])
 
 
 def make_views(seed=1, noise=0.3, offset_mm=6.0):
-    """Sei piani a z = 300..350; ogni vista ha il master spostato lateralmente."""
+    """Six planes at z = 300..350; each view has the master shifted laterally."""
     rng = np.random.default_rng(seed)
     world, _ = make_points()
     view_ids = np.repeat(np.arange(6), len(world) // 6)
     offsets = rng.uniform(-offset_mm, offset_mm, (6, 2))
-    offsets[0] = 0  # vista di riferimento
+    offsets[0] = 0  # reference view
     shifted = world.astype(np.float64).copy()
     shifted[:, :2] += offsets[view_ids]
     image = distort_points(project(P_TRUE, shifted), CENTER, K_RADIAL)
@@ -94,7 +94,7 @@ def test_joint_fit_recovers_reference_view_geometry():
     world, image, view_ids, _ = make_views()
     model = fit_camera(world, image, view_ids, image_size=(1700, 1240))
 
-    ref = view_ids == 0  # offset nullo: ciò che il modello predice è verificabile
+    ref = view_ids == 0  # zero offset: what the model predicts can be checked
     truth = distort_points(project(P_TRUE, world[ref]), CENTER, K_RADIAL)
     pred = distort_points(project(model.P, world[ref]), model.center, model.k)
 
@@ -104,7 +104,7 @@ def test_joint_fit_recovers_reference_view_geometry():
 
 def test_residuals_on_held_out_points_stay_within_noise():
     world, image, view_ids, _ = make_views(noise=0.3)
-    train = np.arange(len(world)) % 10 != 0  # 10% dei punti di ogni vista escluso
+    train = np.arange(len(world)) % 10 != 0  # 10% of the points of each view excluded
 
     model = fit_camera(world[train], image[train], view_ids[train], image_size=(1700, 1240))
     held_out = model_residuals(model, world[~train], image[~train], view_ids[~train])
@@ -116,9 +116,9 @@ def test_residuals_on_held_out_points_stay_within_noise():
 def test_robust_fit_discards_a_spurious_column_of_centres():
     world, image, view_ids, _ = make_views()
     bad = np.zeros(len(world), bool)
-    bad[view_ids == 3] = world[view_ids == 3, 0] == world[view_ids == 3, 0].max()  # ultima colonna di una vista
+    bad[view_ids == 3] = world[view_ids == 3, 0] == world[view_ids == 3, 0].max()  # last column of a view
     image = image.copy()
-    image[bad] += [60.0, 0.0]  # centri spostati di 60 px, come una colonna rilevata male al bordo
+    image[bad] += [60.0, 0.0]  # centres shifted by 60 px, like a badly detected column at the edge
 
     plain = fit_camera(world, image, view_ids, image_size=(1700, 1240))
     model, inliers = fit_camera_robust(world, image, view_ids, image_size=(1700, 1240))

@@ -7,14 +7,14 @@ from scipy.signal import find_peaks
 
 @dataclass(frozen=True)
 class Peak:
-    y: float            # mm, posizione lungo il profilo
-    height: float       # mm sopra il piano di appoggio
-    left_angle: float   # gradi rispetto all'orizzontale, fianco a sinistra
-    right_angle: float  # gradi rispetto all'orizzontale, fianco a destra
+    y: float            # mm, position along the profile
+    height: float       # mm above the resting plane
+    left_angle: float   # degrees from the horizontal, left flank
+    right_angle: float  # degrees from the horizontal, right flank
 
 
 def level_to_plate(y, h, tolerances=(5.0, 2.0, 1.5)):
-    """Sottrae la retta del piano di appoggio, stimata iterativamente sui punti più bassi."""
+    """Subtract the line of the resting plane, estimated iteratively on the lowest points."""
     line = np.array([0.0, np.median(h[h <= np.percentile(h, 20)])])
     for tol in tolerances:
         on_plate = np.abs(h - np.polyval(line, y)) < tol
@@ -23,7 +23,7 @@ def level_to_plate(y, h, tolerances=(5.0, 2.0, 1.5)):
 
 
 def _flank_line(y, h, y_range, h_range):
-    """Retta ai minimi quadrati totali sui punti del fianco nella finestra: (punto medio, direzione) o None."""
+    """Total-least-squares line through the flank points in the window: (midpoint, direction) or None."""
     inside = (y >= y_range[0]) & (y <= y_range[1]) & (h >= h_range[0]) & (h <= h_range[1])
     if inside.sum() < 5:
         return None
@@ -32,17 +32,17 @@ def _flank_line(y, h, y_range, h_range):
 
 
 def _angle(line):
-    """Inclinazione (gradi) rispetto all'orizzontale di una retta (punto, direzione); nan se manca."""
+    """Inclination (degrees) from the horizontal of a line (point, direction); nan if missing."""
     return float("nan") if line is None else float(np.degrees(np.arctan2(abs(line[1][1]), abs(line[1][0]))))
 
 
 def _apex_height(y, h, y_peak, h_peak, left, right, plateau=3.0, tip=0.6, reach=3.0, lift=4.0):
-    """Altezza di un picco dal profilo grezzo (y, h), che nell'apice è sempre troncato.
+    """Height of a peak from the raw profile (y, h), which is always truncated at the apex.
 
-    La lama ha spessore e il baricentro per riga taglia la cima: un picco acuto si stima con
-    l'intersezione delle rette dei due fianchi, un piano largo (più di `plateau` mm entro `tip` mm
-    dalla cima) con la mediana dei suoi punti. Se un fianco non è misurabile, o l'intersezione cade
-    lontano dal picco, si ripiega sul massimo dei punti vicini.
+    The sheet has thickness and the per-row centroid cuts the top: a sharp peak is estimated from
+    the intersection of the lines of the two flanks, a wide plateau (more than `plateau` mm within `tip` mm
+    of the top) from the median of its points. If a flank cannot be measured, or the intersection falls
+    far from the peak, it falls back to the maximum of the nearby points.
     """
     near = np.abs(y - y_peak) <= 6.0
     top = near & (h >= h[near].max() - tip)
@@ -63,16 +63,16 @@ def _apex_height(y, h, y_peak, h_peak, left, right, plateau=3.0, tip=0.6, reach=
 
 
 def measure_peaks(y, h, prominence=8.0, min_separation=5.0, band=(0.25, 0.75), reach=60.0):
-    """Picchi di un profilo già livellato (piano a h = 0): altezza e inclinazione dei fianchi.
+    """Peaks of an already levelled profile (plane at h = 0): height and flank inclination.
 
-    L'angolo di ogni fianco si misura sulla fascia centrale della salita (da `band[0]` a
-    `band[1]` dell'altezza fra picco e base adiacente), per evitare spigoli e raccordi.
+    The angle of each flank is measured on the central band of the rise (from `band[0]` to
+    `band[1]` of the height between the peak and the adjacent base), to avoid corners and fillets.
     """
     order = np.argsort(y)
     y, h = np.asarray(y)[order], np.asarray(h)[order]
     smooth = median_filter(h, size=5)
     idx, _ = find_peaks(smooth, prominence=prominence)
-    # punti sfalsati su un bordo verticale non devono dare picchi doppi: si tiene il più alto
+    # staggered points on a vertical edge must not give double peaks: keep the highest
     kept = []
     for i in sorted(idx, key=lambda i: -smooth[i]):
         if all(abs(y[i] - y[j]) >= min_separation for j in kept):

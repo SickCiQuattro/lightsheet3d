@@ -45,8 +45,9 @@ Other calibration figures: the light plane has 0.51 mm rms error on held-out poi
 
 ### What limits the accuracy
 
-Three measurements on the real data, reproduced in [notebook 6](notebooks/06_heldout_validation.ipynb):
+Four measurements on the real data, the first three reproduced in [notebook 6](notebooks/06_heldout_validation.ipynb):
 
+- **The lens is heavily distorted, but it is not what limits the scans.** It displaces the corners of the image by up to 270 px, and the radial model with two coefficients brings the median reprojection residual to 1.6 px. The sheet, however, falls near the middle of the image (columns 1100–1250 of 2130), where the displacement is at most about 40 px at the two ends of the line, so the residual distortion hardly touches the measurement. A second acquisition session (1818×1212, similar distortion, corners displaced by up to 230 px) calibrates with the same code through its own `dataset.toml`, with four views and 4.7 px rms; it has no drawings, so it is not used for the results.
 - **The triangulation is weak.** The sheet moves only 0.79 px for each mm of height, so one pixel of error on the sheet is **1.27 mm** of height. The 0.9 mm error on the test scans corresponds to about 0.7 px: the result is close to what this laser and camera geometry allows, not to a limit of the code.
 - **The setup moved during the session.** The line of the sheet on the support plane sits at −0.05 px of the calibration in the first scans and at up to −1.75 px in the last ones, about 2 mm. The levelling of each scan removes a pure shift, but it shows that the camera, the laser or the plane were not still.
 
@@ -122,7 +123,7 @@ scans_dir = "scans"
 manifest = "scans.csv"          # optional: file,solid,role of the scans with a known solid
 ```
 
-The master is a grid of circles with three larger ones in an "L" (the corner is the origin; the arms point toward increasing columns and rows, 3 and 2 pitches long here).
+The master is a grid of circles with three larger ones in an "L" (the corner is the origin; the arms point toward increasing columns and rows, 3 and 2 pitches long here). The pitch cannot be recovered from the images: scaling x and y by a constant is absorbed exactly by the projection matrix, so it only sets the scale in millimetres of Y. The 1.00 found for the aligned scans (see above) is the only independent check of the 20 mm.
 
 ## How it works
 

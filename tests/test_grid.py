@@ -11,7 +11,7 @@ from lightsheet3d.grid import (
 
 
 def synthetic_grid(cols, rows, step=60, radius=12, margin=80, big=(), big_radius=19):
-    """Griglia di cerchi; i (col, riga) in `big` hanno raggio maggiore."""
+    """Grid of circles; the (col, row) entries in `big` have a larger radius."""
     img = np.full((rows * step + 2 * margin, cols * step + 2 * margin), 255, np.uint8)
     for r in range(rows):
         for c in range(cols):
@@ -46,7 +46,7 @@ def test_returns_none_when_no_grid():
 
 
 def test_origin_is_corner_of_the_three_large_circles():
-    big = [(3, 2), (7, 2), (3, 5)]  # angolo in (3, 2)
+    big = [(3, 2), (7, 2), (3, 5)]  # corner at (3, 2)
     img = synthetic_grid(cols=12, rows=10, big=big)
     _, centers = find_first_valid_circles_grid(img, max_cols=12, max_rows=10, min_size=8)
 
@@ -54,7 +54,7 @@ def test_origin_is_corner_of_the_three_large_circles():
 
 
 def test_origin_corner_is_found_wherever_the_triplet_sits():
-    big = [(8, 6), (4, 6), (8, 3)]  # angolo in (8, 6)
+    big = [(8, 6), (4, 6), (8, 3)]  # corner at (8, 6)
     img = synthetic_grid(cols=12, rows=10, big=big)
     _, centers = find_first_valid_circles_grid(img, max_cols=12, max_rows=10, min_size=8)
 
@@ -64,7 +64,7 @@ def test_origin_corner_is_found_wherever_the_triplet_sits():
 def test_origin_requires_three_large_circles():
     img = synthetic_grid(cols=12, rows=10)
     _, centers = find_first_valid_circles_grid(img, max_cols=12, max_rows=10, min_size=8)
-    # griglia senza cerchi grandi: le aree sono tutte uguali, nessun angolo ben definito
+    # grid without large circles: the areas are all equal, no well-defined corner
     with pytest.raises(ValueError):
         find_origin_index(img, centers)
 
@@ -79,7 +79,7 @@ def test_object_points_are_centred_on_origin_with_known_pitch_and_height():
 
 
 def test_finds_the_grid_when_the_large_circles_exceed_the_default_blob_area():
-    # il master vicino alla camera: i tre cerchi grandi superano i 5000 px² del rilevatore di OpenCV
+    # the master close to the camera: the three large circles exceed the 5000 px² of OpenCV's detector
     img = synthetic_grid(cols=8, rows=6, step=160, radius=30, margin=150, big={(2, 2), (5, 2), (2, 4)}, big_radius=45)
 
     pattern, _ = find_first_valid_circles_grid(img, max_cols=9, max_rows=7, min_size=6)
@@ -89,16 +89,16 @@ def test_finds_the_grid_when_the_large_circles_exceed_the_default_blob_area():
 
 @pytest.mark.parametrize("rotate", [False, True])
 def test_orient_grid_puts_the_l_arms_toward_increasing_columns_and_rows(rotate):
-    # "L" con origine in (col 3, riga 2): bracci lunghi 3 colonne e 2 righe
+    # "L" with origin at (col 3, row 2): arms 3 columns and 2 rows long
     big = {(3, 2), (6, 2), (3, 4)}
     img = synthetic_grid(cols=10, rows=8, step=70, radius=13, margin=90, big=big)
     if rotate:
-        img = cv.rotate(img, cv.ROTATE_180)  # findCirclesGrid restituisce i centri in un altro ordine
+        img = cv.rotate(img, cv.ROTATE_180)  # findCirclesGrid returns the centres in a different order
 
     pattern, centers = find_first_valid_circles_grid(img, max_cols=10, max_rows=8, min_size=8)
     centers, origin = orient_grid(img, pattern, centers)
 
-    # i tre cerchi grandi cadono nei punti dell'immagine in cui sono disegnati, qualunque sia l'ordine dei centri
+    # the three large circles fall on the image points where they are drawn, whatever the order of the centres
     def pixel(col, row):
         xy = np.array([90 + col * 70, 90 + row * 70], float)
         return np.array(img.shape[::-1], float) - xy if rotate else xy

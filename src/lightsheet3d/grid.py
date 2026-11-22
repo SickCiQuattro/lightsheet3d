@@ -3,18 +3,18 @@ import numpy as np
 
 
 def _blob_detector(max_area=20000):
-    """Rilevatore di blob con area massima alta: quello di default (5000 px) scarta i cerchi grandi
-    dell'"L" quando il master è vicino alla camera."""
+    """Blob detector with a high maximum area: the default one (5000 px) discards the large circles
+    of the "L" when the master is close to the camera."""
     params = cv.SimpleBlobDetector_Params()
     params.maxArea = max_area
     return cv.SimpleBlobDetector_create(params)
 
 
 def find_first_valid_circles_grid(img_gray, max_cols, max_rows, min_size=10):
-    """Cerca il pattern di cerchi più grande, dai pattern grandi ai piccoli.
+    """Look for the largest circle pattern, from large patterns to small ones.
 
-    Ritorna ((colonne, righe), centri) con centri float64 di shape (n, 2) in
-    ordine row-major, oppure (None, None) se nessun pattern è valido.
+    Returns ((columns, rows), centres) with float64 centres of shape (n, 2) in
+    row-major order, or (None, None) if no pattern is valid.
     """
     detector = _blob_detector()
     for cols in range(max_cols, min_size - 1, -1):
@@ -28,7 +28,7 @@ def find_first_valid_circles_grid(img_gray, max_cols, max_rows, min_size=10):
 
 
 def _large_circles(img_gray, centers, min_area_ratio):
-    """Indici dei tre cerchi più estesi; ValueError se non sono nettamente più grandi del quarto."""
+    """Indices of the three largest circles; ValueError if they are not clearly larger than the fourth."""
     _, binary = cv.threshold(img_gray, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU)
     _, labels, stats, _ = cv.connectedComponentsWithStats(binary)
     h, w = labels.shape
@@ -38,16 +38,16 @@ def _large_circles(img_gray, centers, min_area_ratio):
 
     order = np.argsort(area)[::-1]
     if area[order[2]] < min_area_ratio * area[order[3]]:
-        raise ValueError("non ci sono tre cerchi nettamente più grandi degli altri")
+        raise ValueError("there are not three circles clearly larger than the others")
     return order[:3]
 
 
 def find_origin_index(img_gray, centers, min_area_ratio=1.3):
-    """Indice del centro che fa da origine: l'angolo della "L" di tre cerchi grandi.
+    """Index of the centre that serves as origin: the corner of the "L" of three large circles.
 
-    I tre cerchi grandi sono i tre blob più estesi; l'angolo è il vertice dove
-    i due lati sono più vicini a 90 gradi. Solleva ValueError se i tre blob
-    non sono nettamente più grandi del quarto.
+    The three large circles are the three largest blobs; the corner is the vertex where
+    the two sides are closest to 90 degrees. Raises ValueError if the three blobs
+    are not clearly larger than the fourth.
     """
     large = _large_circles(img_gray, centers, min_area_ratio)
 
@@ -59,12 +59,12 @@ def find_origin_index(img_gray, centers, min_area_ratio=1.3):
 
 
 def orient_grid(img_gray, pattern, centers, min_area_ratio=1.3):
-    """Riordina i centri in modo che l'"L" vada verso colonne e righe crescenti; ritorna (centri, origine).
+    """Reorder the centres so that the "L" points towards increasing columns and rows; returns (centres, origin).
 
-    `findCirclesGrid` non distingue una griglia simmetrica ruotata di 180°: l'ordine dei centri, e
-    quindi il verso degli assi, dipende dall'immagine. L'"L" ha il vertice nell'origine e i due bracci
-    lungo una riga e una colonna: se vanno verso indici decrescenti si invertono colonne o righe.
-    Solleva ValueError se i bracci non sono allineati alla griglia.
+    `findCirclesGrid` cannot tell a symmetric grid rotated by 180° apart: the order of the centres, and
+    hence the direction of the axes, depends on the image. The "L" has its vertex at the origin and its two arms
+    along a row and a column: if they point towards decreasing indices the columns or rows are reversed.
+    Raises ValueError if the arms are not aligned with the grid.
     """
     cols, rows = pattern
     origin = find_origin_index(img_gray, centers, min_area_ratio)
@@ -73,7 +73,7 @@ def orient_grid(img_gray, pattern, centers, min_area_ratio=1.3):
     along_row = [c - c0 for r, c in arms if r == r0]
     along_col = [r - r0 for r, c in arms if c == c0]
     if len(along_row) != 1 or len(along_col) != 1:
-        raise ValueError("i bracci della \"L\" non sono allineati alle righe e alle colonne della griglia")
+        raise ValueError("the arms of the \"L\" are not aligned with the rows and columns of the grid")
     grid = centers.reshape(rows, cols, 2)
     if along_row[0] < 0:
         grid, c0 = grid[:, ::-1], cols - 1 - c0
@@ -83,7 +83,7 @@ def orient_grid(img_gray, pattern, centers, min_area_ratio=1.3):
 
 
 def build_object_points(pattern, origin_index, step, z):
-    """Punti oggetto (n, 3) in mm: origine in `origin_index`, x lungo le colonne, y lungo le righe."""
+    """Object points (n, 3) in mm: origin at `origin_index`, x along the columns, y along the rows."""
     cols, rows = pattern
     cx, cy = np.meshgrid(np.arange(cols), np.arange(rows))
     xy = np.column_stack([cx.ravel(), cy.ravel()]).astype(np.float64)

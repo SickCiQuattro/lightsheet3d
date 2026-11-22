@@ -5,7 +5,7 @@ from lightsheet3d.lightplane import fit_plane, plane_errors, ray_plane_point, tr
 
 K = np.array([[1250.0, 0, 590], [0, 1250.0, 410], [0, 0, 1]])
 P = K @ np.hstack([np.eye(3), -np.array([[1.0], [168.0], [38.0]])])
-# lama quasi parallela all'asse ottico: z = A x + B y + C con A grande
+# sheet almost parallel to the optical axis: z = A x + B y + C with large A
 PLANE = np.array([5.0, 0.05, 330.0])
 
 

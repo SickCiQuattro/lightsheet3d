@@ -1,4 +1,4 @@
-"""Valutazione su tutte le scansioni con solido noto di un dataset (il manifest `scans.csv`)."""
+"""Evaluation on all the scans of a dataset with a known solid (the `scans.csv` manifest)."""
 import csv
 from dataclasses import dataclass
 
@@ -12,13 +12,13 @@ from .solids import SOLIDS
 class ScanResult:
     file: str
     solid: str
-    role: str                  # "dev" o "test": vedi `dataset.ManifestEntry`
-    points: int                # punti sul solido
-    median: float              # mm, distanza mediana dal profilo nominale
+    role: str                  # "dev" or "test": see `dataset.ManifestEntry`
+    points: int                # points on the solid
+    median: float              # mm, median distance from the nominal profile
     p90: float
     rms: float
-    height_errors: tuple       # mm, per picco; vuoto se i picchi misurati non sono quanti i nominali
-    scale: float = 1.0         # allungamento di Y trovato (1 senza `oblique`)
+    height_errors: tuple       # mm, per peak; empty if the measured peaks are not as many as the nominal ones
+    scale: float = 1.0         # Y stretch found (1 without `oblique`)
 
 
 def evaluate(calibration, dataset, solids=SOLIDS, prominence=6.0, oblique=False):
@@ -33,7 +33,7 @@ def evaluate(calibration, dataset, solids=SOLIDS, prominence=6.0, oblique=False)
 
 
 def summarize(results, by="role"):
-    """{gruppo: {scans, median (media delle mediane), worst, height_mean, height_rms}} per `role` o `solid`."""
+    """{group: {scans, median (mean of the medians), worst, height_mean, height_rms}} per `role` or `solid`."""
     groups = {}
     for r in results:
         groups.setdefault(getattr(r, by), []).append(r)

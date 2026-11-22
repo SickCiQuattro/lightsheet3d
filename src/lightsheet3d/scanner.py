@@ -1,4 +1,4 @@
-"""Livello di uso: calibrare un dataset, misurare una scansione e confrontarla con un solido noto.
+"""Usage level: calibrate a dataset, measure a scan and compare it with a known solid.
 
     dataset = Dataset.load("data/dataset.toml")
     calibration = Calibration.fit(dataset)
@@ -26,16 +26,16 @@ VERSION = 1
 
 @dataclass(frozen=True)
 class Calibration:
-    """Camera e piano della lama, più il metodo con cui si trova la lama e la quota del piano d'appoggio."""
+    """Camera and sheet plane, plus the method used to find the sheet and the height of the resting plane."""
     model: CameraModel
-    plane: np.ndarray                 # (A, B, C) di z = A x + B y + C
-    extractor: str = "centroid"       # chiave di `laser.EXTRACTORS`
+    plane: np.ndarray                 # (A, B, C) of z = A x + B y + C
+    extractor: str = "centroid"       # key of `laser.EXTRACTORS`
     plate_z: float = PLATE_Z
-    report: dict = field(default_factory=dict, compare=False)  # diagnostica del fit, non salvata
+    report: dict = field(default_factory=dict, compare=False)  # fit diagnostics, not saved
 
     @classmethod
     def fit(cls, dataset, extractor="centroid"):
-        """Calibra camera e piano della lama con le immagini e le convenzioni di `dataset`."""
+        """Calibrate camera and sheet plane with the images and conventions of `dataset`."""
         camera = calibrate_camera(dataset.target_path, z_max=dataset.reference_z, pitch=dataset.pitch_mm,
                                   image_size=dataset.image_size, z_of=dataset.z_of,
                                   pattern_max=dataset.pattern_max, pattern_min=dataset.pattern_min)
@@ -58,7 +58,7 @@ class Calibration:
     def load(cls, path):
         data = json.loads(Path(path).read_text())
         if data.get("version") != VERSION:
-            raise ValueError(f"{path}: versione {data.get('version')} non supportata (attesa {VERSION})")
+            raise ValueError(f"{path}: version {data.get('version')} not supported (expected {VERSION})")
         model = CameraModel(np.array(data["P"]), np.array(data["center"]), np.array(data["k"]),
                             np.array(data["offsets"]), np.array(data["views"]), float(data["rms"]))
         return cls(model, np.array(data["plane"]), data.get("extractor", "centroid"), data.get("plate_z", PLATE_Z))
@@ -66,14 +66,14 @@ class Calibration:
 
 @dataclass(frozen=True)
 class Comparison:
-    """Confronto di un profilo misurato con quello nominale di un solido."""
+    """Comparison of a measured profile with the nominal one of a solid."""
     solid: object                     # solids.Solid
-    sign: int                         # verso dell'asse Y della scansione rispetto al solido
+    sign: int                         # direction of the scan's Y axis relative to the solid
     shift: float                      # mm
-    scale: float                      # allungamento di Y del profilo nominale (1 = taglio perpendicolare)
-    distance: np.ndarray              # (n,) distanza di ogni punto dal profilo nominale, mm
-    on_solid: np.ndarray              # (n,) bool: punti sopra il solido, non sul piano d'appoggio
-    peaks: list                       # [(Peak misurato, altezza nominale)] se i picchi sono quanti quelli nominali
+    scale: float                      # Y stretch of the nominal profile (1 = perpendicular cut)
+    distance: np.ndarray              # (n,) distance of each point from the nominal profile, mm
+    on_solid: np.ndarray              # (n,) bool: points on the solid, not on the resting plane
+    peaks: list                       # [(measured Peak, nominal height)] if the peaks are as many as the nominal ones
 
     @property
     def median(self):
@@ -89,21 +89,21 @@ class Comparison:
 
     @property
     def tilt_deg(self):
-        """Angolo (gradi) fra la lama e la normale all'asse del solido, dedotto da `scale`: 0 se il taglio è perpendicolare."""
+        """Angle (degrees) between the sheet and the normal to the solid's axis, inferred from `scale`: 0 if the cut is perpendicular."""
         return float(np.degrees(np.arccos(min(1.0, 1.0 / self.scale))))
 
     @property
     def height_errors(self):
-        """Altezza misurata meno nominale di ogni picco, mm (vuoto se i picchi non corrispondono)."""
+        """Measured minus nominal height of each peak, mm (empty if the peaks do not match)."""
         return np.array([peak.height - nominal for peak, nominal in self.peaks])
 
 
 @dataclass(frozen=True)
 class Profile:
-    """Profilo di una scansione: punti 3D, e altezza dal piano d'appoggio lungo Y."""
+    """Profile of a scan: 3D points, and height above the resting plane along Y."""
     image: str
-    points: np.ndarray                # (n, 3) mm nel riferimento del master
-    height: np.ndarray                # (n,) mm sopra il piano d'appoggio (livellato)
+    points: np.ndarray                # (n, 3) mm in the master's reference frame
+    height: np.ndarray                # (n,) mm above the resting plane (levelled)
 
     @property
     def y(self):
@@ -113,10 +113,10 @@ class Profile:
         return measure_peaks(self.y, self.height, prominence=prominence, min_separation=min_separation)
 
     def compare(self, solid, prominence=6.0, oblique=False):
-        """Allinea il profilo nominale di `solid` alla scansione e misura la distanza di ogni punto.
+        """Align the nominal profile of `solid` to the scan and measure the distance of each point.
 
-        Con `oblique=True` il profilo nominale può anche allungarsi lungo Y, come succede se il solido è
-        posato di traverso rispetto alla lama; `Comparison.scale` e `tilt_deg` dicono di quanto.
+        With `oblique=True` the nominal profile may also stretch along Y, as happens when the solid is
+        laid across the sheet; `Comparison.scale` and `tilt_deg` say by how much.
         """
         if oblique:
             sign, shift, scale = align_oblique(solid, self.y, self.height)
@@ -131,7 +131,7 @@ class Profile:
         return Comparison(solid, sign, shift, scale, distance, on_solid, pairs)
 
     def to_ply(self, path, comparison=None):
-        """Punti (x, y, altezza) in PLY, colorati con la distanza dal profilo nominale se c'è `comparison`."""
+        """Points (x, y, height) as PLY, coloured by the distance from the nominal profile if `comparison` is given."""
         colors = None if comparison is None else distance_colors(comparison.distance)
         write_ply(path, np.column_stack([self.points[:, 0], self.y, self.height]), colors)
 

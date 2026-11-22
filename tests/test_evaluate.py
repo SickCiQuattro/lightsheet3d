@@ -19,7 +19,7 @@ def test_summarize_groups_by_role_and_solid():
 
     assert by_role["test"] == {"scans": 2, "median": 1.25, "worst": 1.5, "height_mean": 1.0, "height_rms": 1.0}
     assert by_solid["corpo1"]["scans"] == 2 and by_solid["corpo1"]["height_mean"] == pytest.approx(1 / 3)
-    assert by_solid["corpo2"]["height_mean"] != by_solid["corpo2"]["height_mean"]  # nan: nessun picco confrontabile
+    assert by_solid["corpo2"]["height_mean"] != by_solid["corpo2"]["height_mean"]  # nan: no comparable peak
 
 
 def test_write_csv_has_one_row_per_scan(tmp_path):
@@ -39,7 +39,7 @@ def test_real_scans_of_all_six_solids_are_measured(real):
 
 
 def test_error_on_the_held_out_scans_stays_below_a_millimetre_and_a_half(real):
-    # le 12 scansioni "test" non hanno guidato nessuna scelta di algoritmo; i valori attuali sono 0.91 mm in media, 1.54 al peggio
+    # the 12 "test" scans did not guide any algorithm choice; the current values are 0.91 mm on average, 1.54 at worst
     summary = summarize(real)["test"]
 
     assert summary["scans"] == 12 and summary["median"] < 1.1 and summary["worst"] < 1.8
@@ -50,6 +50,6 @@ def test_allowing_the_oblique_stretch_lowers_the_held_out_error(real):
     oblique = evaluate(Calibration.fit(dataset), dataset, oblique=True)
     plain, stretched = summarize(real)["test"]["median"], summarize(oblique)["test"]["median"]
 
-    assert stretched < plain - 0.05 and stretched < 0.95  # 0.91 -> 0.80 mm oggi
-    # dove il solido è allineato alla lama il parametro deve restare vicino a 1: la scala di Y della calibrazione è giusta
+    assert stretched < plain - 0.05 and stretched < 0.95  # 0.91 -> 0.80 mm today
+    # where the solid is aligned with the sheet the parameter must stay close to 1: the calibration's Y scale is right
     assert [r.scale for r in oblique if r.file in ("30o31.jpg", "30o33.jpg", "30o7.jpg", "30o12.jpg")] == pytest.approx([1.0] * 4, abs=0.03)

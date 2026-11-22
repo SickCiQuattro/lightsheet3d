@@ -5,7 +5,7 @@ from lightsheet3d.laser import laser_centroids, laser_steger
 
 
 def synthetic_frame(height=400, width=300, half_width=7, gap=None, speck=True):
-    """Lama inclinata e satura su fondo grigio; `gap` = (riga0, riga1) senza lama."""
+    """Tilted, saturated sheet on a grey background; `gap` = (row0, row1) without the sheet."""
     rng = np.random.default_rng(0)
     img = np.full((height, width, 3), 170, np.uint8)
     img = np.clip(img + rng.normal(0, 4, img.shape), 0, 255).astype(np.uint8)
@@ -17,7 +17,7 @@ def synthetic_frame(height=400, width=300, half_width=7, gap=None, speck=True):
         lo, hi = int(np.ceil(centers[r] - half_width)), int(np.floor(centers[r] + half_width))
         img[r, lo:hi + 1] = 255
     if speck:
-        img[50:53, 250:253] = 255  # riflesso isolato
+        img[50:53, 250:253] = 255  # isolated reflection
     return img, centers
 
 
@@ -57,17 +57,17 @@ def test_returns_empty_array_when_no_laser():
 
 def test_centroid_is_subpixel_on_a_blurred_stripe():
     cols = np.arange(300)
-    profile = np.clip(80 + 300 * np.exp(-((cols - 100.3) ** 2) / (2 * 2.5**2)), 0, 255)  # nucleo saturo, bordi sfumati
+    profile = np.clip(80 + 300 * np.exp(-((cols - 100.3) ** 2) / (2 * 2.5**2)), 0, 255)  # saturated core, blurred edges
     img = np.repeat(np.tile(profile, (400, 1))[..., None], 3, axis=2).astype(np.uint8)
 
     uv = laser_centroids(img)
 
     assert len(uv) == 400
-    assert np.abs(uv[:, 0] - 100.3).max() < 0.1  # la media del solo nucleo saturo darebbe 100.0
+    assert np.abs(uv[:, 0] - 100.3).max() < 0.1  # the mean of the saturated core alone would give 100.0
 
 
 def blurred_frame(sigma=2.5, grain=12, seed=0, height=400, width=300, half_width=3):
-    """Lama inclinata sfocata con rumore sulle intensità; il centro vero è 100 + 0.1 riga."""
+    """Tilted, blurred sheet with noise on the intensities; the true centre is 100 + 0.1 row."""
     rng = np.random.default_rng(seed)
     cols = np.arange(width)
     rows = np.arange(height)
@@ -86,7 +86,7 @@ def test_steger_finds_the_same_rows_as_the_centroid_and_ignores_specks():
     assert len(a) == len(b) == 360
     assert np.array_equal(a[:, 1], np.round(b[:, 1]))
     error = np.abs(b[:, 0] - centers[np.round(b[:, 1]).astype(int)])
-    assert np.median(error) < 0.15 and error.max() < 1.5  # alle estremità della lama la normale ruota: si ripiega sul baricentro
+    assert np.median(error) < 0.15 and error.max() < 1.5  # at the ends of the sheet the normal rotates: it falls back to the centroid
 
 
 def test_steger_is_more_accurate_than_the_centroid_on_a_blurred_noisy_stripe():

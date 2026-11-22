@@ -1,4 +1,4 @@
-"""Confronto fra il profilo misurato e quello nominale del solido."""
+"""Comparison between the measured profile and the nominal one of the solid."""
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -6,7 +6,7 @@ from .solids import align, distances, nominal_curve
 
 
 def compare_profile(ax, solid, y, h, peaks):
-    """Disegna profilo misurato e nominale su `ax`; restituisce le statistiche del confronto."""
+    """Plot the measured and nominal profile on `ax`; returns the comparison statistics."""
     sign, shift = align(solid, y, h)
     yn, hn = nominal_curve(solid, sign, shift)
     on_solid = (y > yn[1]) & (y < yn[-2])
@@ -25,10 +25,10 @@ def compare_profile(ax, solid, y, h, peaks):
 
 
 def scan_3d(ax, solid, X, h, sign, shift, vmax=2.0):
-    """Curva 3D misurata sopra il solido nominale, estruso lungo x; ritorna le distanze (mm) di ogni punto.
+    """Measured 3D curve above the nominal solid, extruded along x; returns the distances (mm) of each point.
 
-    `X` (n, 3) sono i punti della scansione e `h` l'altezza livellata di ognuno. Ogni punto è
-    colorato con la sua distanza dal profilo nominale, come nell'esportazione PLY.
+    `X` (n, 3) are the scan points and `h` the levelled height of each. Each point is
+    coloured by its distance from the nominal profile, as in the PLY export.
     """
     from .export import distance_colors
 
@@ -44,7 +44,7 @@ def scan_3d(ax, solid, X, h, sign, shift, vmax=2.0):
     xx, yy = np.meshgrid(grid_x, grid_y)
     zz = np.tile(surface[:, None], (1, 2))
     ax.plot_surface(xx, yy, zz, facecolors=plt.cm.Blues(0.25 + 0.5 * zz / 50), alpha=0.35, linewidth=0, shade=False)
-    ax.plot(np.full_like(grid_y, grid_x[0]), grid_y, surface, color="0.4", lw=0.8)  # spigolo di fronte, per leggere la forma
+    ax.plot(np.full_like(grid_y, grid_x[0]), grid_y, surface, color="0.4", lw=0.8)  # front edge, to read the shape
     on_solid = (y > yn[1] - 2) & (y < yn[-2] + 2)
     ax.scatter(X[on_solid, 0], y[on_solid], h[on_solid], c=distance_colors(dist[on_solid], vmax) / 255, s=7, depthshade=False)
     ax.set(xlabel="X (mm)", ylabel="Y (mm)", zlabel="altezza (mm)", ylim=(yn[1] - 5, yn[-2] + 5), zlim=(0, 55))

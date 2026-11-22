@@ -27,8 +27,8 @@ def _walk(steps):
     return np.cumsum([(0.0, 0.0), *steps], axis=0)
 
 
-# Profili costruiti a mano dalle quote dei disegni (corsa del fianco = altezza / tan(inclinazione)): sono un
-# controllo indipendente dei profili estratti dai PDF in profiles.json.
+# Profiles built by hand from the drawing dimensions (flank run = height / tan(inclination)): they are an
+# independent check of the profiles extracted from the PDFs in profiles.json.
 HAND_CORPO6 = _walk([
     (0, 10), (5, 0), (0, 5), (5, 0),
     (_rise(30, 60), 30), (_rise(30, 75), -30), (10, 0),
@@ -41,7 +41,7 @@ _CORPO5_FLANKS = _walk([
     (11.38, -11.38 * tan(radians(65))), (6.95, 6.95 * tan(radians(80))), (8, 0),
     (13.95, -13.95 * tan(radians(70))),
 ])
-HAND_CORPO5 = np.vstack([_CORPO5_FLANKS, [_CORPO5_FLANKS[-1, 0], 0.0]])  # più il lato destro fino al piano
+HAND_CORPO5 = np.vstack([_CORPO5_FLANKS, [_CORPO5_FLANKS[-1, 0], 0.0]])  # plus the right side down to the plane
 
 
 def _distance_between(a, b, step=0.05):
@@ -71,7 +71,7 @@ def test_every_profile_has_the_quoted_width_and_height(solid, width, height):
 def test_corpo1_matches_the_staircase_and_the_slope_read_from_the_drawing():
     expected = [(0, 0), (0, 15), (15, 15), (15, 45), (30, 45), (30, 35), (45, 35), (45, 25), (75, 10), (75, 0)]
 
-    assert np.allclose(CORPO1.outline, expected, atol=0.03)  # pendenza 1:2, angolo quotato 116.57 gradi
+    assert np.allclose(CORPO1.outline, expected, atol=0.03)  # slope 1:2, dimensioned angle 116.57 degrees
 
 
 def test_solid_registry_lists_the_six_profiles():
@@ -79,12 +79,12 @@ def test_solid_registry_lists_the_six_profiles():
 
 
 def test_corpo6_matches_the_quoted_dimensions():
-    assert CORPO6.width == pytest.approx(100, abs=0.05)  # le 12 quote in pianta sommano 100.01
+    assert CORPO6.width == pytest.approx(100, abs=0.05)  # the 12 plan-view dimensions add up to 100.01
     assert [h for _, h in CORPO6.peaks()] == pytest.approx([45, 25.05, 45], abs=0.06)
 
 
 def test_corpo5_matches_the_quoted_dimensions():
-    assert CORPO5.width == pytest.approx(75, abs=0.01)  # le quote in pianta sommano esattamente 75
+    assert CORPO5.width == pytest.approx(75, abs=0.01)  # the plan-view dimensions add up to exactly 75
     assert [h for _, h in CORPO5.peaks()] == pytest.approx([35, 30, 45], abs=0.1)
 
 

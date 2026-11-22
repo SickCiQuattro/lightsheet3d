@@ -4,10 +4,10 @@ from scipy.ndimage import gaussian_filter
 
 
 def _stripe_runs(img_bgr, threshold, min_area):
-    """(gray, [(riga, inizio, fine)]): il tratto saturo più lungo della lama in ogni riga.
+    """(gray, [(row, start, end)]): the longest saturated run of the sheet in each row.
 
-    Il nucleo della lama è saturo su tutti i canali, mentre la carta chiara ha R alto ma G e B più bassi:
-    si usa min(B, G, R). Le componenti connesse piccole (riflessi) sono scartate.
+    The core of the sheet is saturated on all channels, whereas light paper has high R but lower G and B:
+    min(B, G, R) is used. Small connected components (reflections) are discarded.
     """
     gray = img_bgr.min(axis=2)
     _, labels, stats, _ = cv.connectedComponentsWithStats((gray >= threshold).astype(np.uint8), connectivity=8)
@@ -22,7 +22,7 @@ def _stripe_runs(img_bgr, threshold, min_area):
 
 
 def _weighted_centroid(gray, row, start, end, margin):
-    """Colonna del baricentro pesato con l'intensità sul tratto saturo [start, end] e `margin` pixel per lato."""
+    """Column of the intensity-weighted centroid over the saturated run [start, end] plus `margin` pixels on each side."""
     window = np.arange(max(start - margin, 0), min(end + margin + 1, gray.shape[1]))
     weight = gray[row, window].astype(np.float64)
     weight -= weight.min()
@@ -30,10 +30,10 @@ def _weighted_centroid(gray, row, start, end, margin):
 
 
 def laser_centroids(img_bgr, threshold=235, min_area=200, margin=2):
-    """Baricentro della lama per ogni riga, in pixel (colonna, riga), senza interpolare.
+    """Centroid of the sheet for each row, in pixels (column, row), without interpolating.
 
-    Il baricentro è pesato con l'intensità sul nucleo saturo e `margin` pixel per lato, così i bordi
-    sfumati danno la posizione sotto il pixel. Le righe senza lama non producono punti.
+    The centroid is weighted by intensity over the saturated core plus `margin` pixels on each side, so the
+    blurred edges give the sub-pixel position. Rows without the sheet produce no points.
     """
     gray, runs = _stripe_runs(img_bgr, threshold, min_area)
     points = [(_weighted_centroid(gray, row, start, end, margin), row) for row, start, end in runs]
@@ -41,18 +41,18 @@ def laser_centroids(img_bgr, threshold=235, min_area=200, margin=2):
 
 
 def laser_steger(img_bgr, sigma=None, threshold=235, min_area=200, margin=3, max_shift=1.0):
-    """Centro della lama per ogni riga con il metodo di Steger, in pixel (colonna, riga).
+    """Centre of the sheet for each row with Steger's method, in pixels (column, row).
 
-    Le righe e la regione di ricerca vengono dal nucleo saturo (come in `laser_centroids`, quindi con la
-    stessa robustezza ai riflessi); la posizione è la cresta della luminosità min(B, G, R) trovata con le
-    derivate gaussiane di scala `sigma`: in ogni pixel l'autovettore della Hessiana con la curvatura più
-    negativa dà la normale alla cresta e il massimo sotto il pixel si cerca lungo di essa. Ricava il
-    centro sulla normale e non sulla riga, e sfrutta il profilo dei bordi invece della sola parte satura.
-    `sigma` deve essere almeno larghezza/(2√3), altrimenti al centro di una lama larga la curvatura si
-    annulla: se manca si ricava dalla larghezza mediana del nucleo saturo, con un minimo di 1.5 px.
-    Se in una riga non c'è una cresta valida, o la cresta dista più di `max_shift` pixel dal baricentro
-    (all'estremità di una lama interrotta la normale ruota e la posizione si sposta di diversi pixel), si
-    ripiega sul baricentro pesato.
+    The rows and the search region come from the saturated core (as in `laser_centroids`, hence with the
+    same robustness to reflections); the position is the ridge of the min(B, G, R) brightness found with
+    Gaussian derivatives of scale `sigma`: at each pixel the eigenvector of the Hessian with the most
+    negative curvature gives the normal to the ridge, and the sub-pixel maximum is searched along it. It finds the
+    centre along the normal rather than along the row, and exploits the edge profile instead of the saturated part alone.
+    `sigma` must be at least width/(2√3), otherwise at the centre of a wide sheet the curvature
+    vanishes: if missing it is derived from the median width of the saturated core, with a minimum of 1.5 px.
+    If a row has no valid ridge, or the ridge is more than `max_shift` pixels from the centroid
+    (at the end of a broken sheet the normal rotates and the position shifts by several pixels), it
+    falls back to the weighted centroid.
     """
     gray, runs = _stripe_runs(img_bgr, threshold, min_area)
     if not runs:
@@ -61,16 +61,16 @@ def laser_steger(img_bgr, sigma=None, threshold=235, min_area=200, margin=3, max
         sigma = max(1.5, 0.3 * float(np.median([end - start + 1 for _, start, end in runs])))
     gray = gray.astype(np.float64)
 
-    def d(order):  # derivata gaussiana; order = (righe, colonne)
+    def d(order):  # Gaussian derivative; order = (rows, columns)
         return gaussian_filter(gray, sigma, order=order)
 
     gx, gy, gxx, gxy, gyy = d((0, 1)), d((1, 0)), d((0, 2)), d((1, 1)), d((2, 0))
 
-    # autovalore più negativo della Hessiana [[gxx, gxy], [gxy, gyy]] e relativo autovettore: la normale alla cresta
+    # most negative eigenvalue of the Hessian [[gxx, gxy], [gxy, gyy]] and its eigenvector: the normal to the ridge
     lam = (gxx + gyy) / 2 - np.hypot((gxx - gyy) / 2, gxy)
     nx, ny = gxy, lam - gxx
     norm = np.hypot(nx, ny)
-    along_x = (gxx <= gyy).astype(np.float64)  # gxy = 0: la normale è l'asse di curvatura minore
+    along_x = (gxx <= gyy).astype(np.float64)  # gxy = 0: the normal is the axis of least curvature
     nx = np.where(norm > 1e-9, nx / np.maximum(norm, 1e-9), along_x)
     ny = np.where(norm > 1e-9, ny / np.maximum(norm, 1e-9), 1 - along_x)
     curvature = nx**2 * gxx + 2 * nx * ny * gxy + ny**2 * gyy

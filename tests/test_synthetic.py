@@ -1,4 +1,4 @@
-"""Pipeline completa su immagini sintetiche: la geometria vera è nota, quindi gli errori sono quelli dell'algoritmo."""
+"""Full pipeline on synthetic images: the true geometry is known, so the errors are those of the algorithm."""
 import numpy as np
 import pytest
 
@@ -24,7 +24,7 @@ def test_clean_calibration_uses_every_view_and_finds_no_drift(clean):
 
     assert camera.skipped == () and sorted(set(camera.view_ids)) == [310, 320, 330, 340, 350]
     assert camera.model.rms < 0.1
-    assert np.abs(camera.model.offsets).max() < 0.05  # il master vero non si sposta: niente deriva inventata
+    assert np.abs(camera.model.offsets).max() < 0.05  # the true master does not move: no invented drift
 
 
 def test_clean_light_plane_matches_the_true_one(clean):
@@ -35,7 +35,7 @@ def test_clean_profile_matches_the_ground_truth(clean):
     assert clean["sign"] == 1 and clean["shift"] == pytest.approx(TRUE_SHIFT, abs=0.5)
     assert np.median(clean["dist"]) < 0.06
     heights = [p.height for p in measure_peaks(clean["y"], clean["h"], prominence=6, min_separation=10)]
-    assert np.allclose(heights, [45, 25.05, 45], atol=0.15)  # senza stima dell'apice erano sottostimati di ~0.5 mm
+    assert np.allclose(heights, [45, 25.05, 45], atol=0.15)  # without apex estimation they were underestimated by ~0.5 mm
 
 
 def test_half_pixel_noise_keeps_the_error_below_half_a_millimetre(noisy):
@@ -44,7 +44,7 @@ def test_half_pixel_noise_keeps_the_error_below_half_a_millimetre(noisy):
 
 
 def test_two_pixel_noise_does_not_flip_the_profile(tmp_path):
-    # con questo seed lo scarto verticale era quasi pari fra l'allineamento giusto e quello speculare
+    # with this seed the vertical residual was almost equal between the correct alignment and the mirrored one
     result = evaluate(CORPO6, tmp_path, noise_px=2.0, seed=2)
 
     assert result["sign"] == 1 and result["shift"] == pytest.approx(TRUE_SHIFT, abs=1.5)

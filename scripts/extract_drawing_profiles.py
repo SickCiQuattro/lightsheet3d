@@ -1,16 +1,16 @@
-"""Estrae i profili nominali dei solidi dai disegni tecnici in PDF e li scrive in `profiles.json`.
+"""Extract the nominal profiles of the solids from the technical drawings in PDF and write them to `profiles.json`.
 
-I disegni sono materiale del corso e non stanno nel repository: questo script serve a rigenerare i profili
-(che sono solo numeri, le quote dei solidi) da una cartella con SDV3D_Corpo1.pdf ... SDV3D_Corpo6.pdf.
+The drawings are course material and are not in the repository: this script regenerates the profiles
+(which are just numbers, the dimensions of the solids) from a folder with SDV3D_Corpo1.pdf ... SDV3D_Corpo6.pdf.
 
-Il PDF contiene il profilo frontale come tracciato vettoriale riempito di grigio chiaro: `pdftocairo -svg`
-lo converte e se ne leggono i vertici esatti, curve comprese. Il riempimento è più stretto del contorno di
-mezzo spessore di linea per lato (circa 0.04 mm in totale), quindi si scala in modo isotropo sulla larghezza
-nominale; la scala isotropa corregge anche il Corpo 4, disegnato a 2:1. La profondità è l'altezza della
-vista dall'alto, nella stessa scala.
+The PDF contains the front profile as a vector path filled with light grey: `pdftocairo -svg`
+converts it and its exact vertices are read, curves included. The fill is narrower than the outline by
+half a line width per side (about 0.04 mm in total), so it is scaled isotropically to the nominal
+width; the isotropic scale also corrects Corpo 4, drawn at 2:1. The depth is the height of the
+top view, at the same scale.
 
-Uso: python scripts/extract_drawing_profiles.py CARTELLA_PDF src/lightsheet3d/profiles.json
-Richiede pdftocairo (poppler).
+Usage: python scripts/extract_drawing_profiles.py PDF_FOLDER src/lightsheet3d/profiles.json
+Requires pdftocairo (poppler).
 """
 import json
 import re
@@ -23,13 +23,13 @@ import cv2 as cv
 import numpy as np
 
 MM_PER_POINT = 25.4 / 72
-FILL = "rgb(94.508362%, 95.292664%, 96.076965%)"  # il grigio (241, 243, 245) del profilo nei disegni
-WIDTH = {1: 75.0, 2: 75.0, 3: 100.0, 4: 75.0, 5: 75.0, 6: 100.0}  # larghezza nominale quotata, mm
-SIMPLIFY = 0.01  # mm: tolleranza con cui gli archi si riducono a poligonali
+FILL = "rgb(94.508362%, 95.292664%, 96.076965%)"  # the grey (241, 243, 245) of the profile in the drawings
+WIDTH = {1: 75.0, 2: 75.0, 3: 100.0, 4: 75.0, 5: 75.0, 6: 100.0}  # dimensioned nominal width, mm
+SIMPLIFY = 0.01  # mm: tolerance with which arcs are reduced to polylines
 
 
 def parse_path(d):
-    """Sottopercorsi di un tracciato cairo (solo M, L, C, Z assoluti) come poligonali in punti PDF."""
+    """Subpaths of a cairo path (absolute M, L, C, Z only) as polylines in PDF points."""
     tokens = re.findall(r"[MLCZ]|-?\d+\.?\d*(?:e-?\d+)?", d)
     subpaths, i = [], 0
     while i < len(tokens):
@@ -69,19 +69,19 @@ def filled_polygons(svg):
 
 
 def extract(svg, width):
-    """(contorno (n, 2) in mm da (0, 0) a (width, 0) per il lato superiore, profondità in mm)."""
+    """(outline (n, 2) in mm from (0, 0) to (width, 0) along the top side, depth in mm)."""
     polygons = filled_polygons(svg)
     widest = max(np.ptp(p[:, 0]) for p in polygons)
-    wide = [p for p in polygons if np.ptp(p[:, 0]) > widest - 0.3]  # vista frontale e vista dall'alto
+    wide = [p for p in polygons if np.ptp(p[:, 0]) > widest - 0.3]  # front view and top view
     front, top = max(wide, key=lambda p: p[:, 1].min()), min(wide, key=lambda p: p[:, 1].min())
     scale = width / np.ptp(front[:, 0])
     points = np.column_stack([(front[:, 0] - front[:, 0].min()) * scale, (front[:, 1].max() - front[:, 1]) * scale])
     points = points[np.r_[True, np.any(np.abs(np.diff(points, axis=0)) > 1e-6, axis=1)]]
     if np.allclose(points[0], points[-1]):
         points = points[:-1]
-    points = np.roll(points, -int(np.argmin(np.hypot(*points.T))), axis=0)  # parte dallo spigolo (0, 0)
+    points = np.roll(points, -int(np.argmin(np.hypot(*points.T))), axis=0)  # starts at the corner (0, 0)
     if points[1, 1] < 1e-6:
-        points = np.vstack([points[0], points[1:][::-1]])  # e sale sul lato sinistro
+        points = np.vstack([points[0], points[1:][::-1]])  # and climbs up the left side
     end = int(np.argmin(np.hypot(points[:, 0] - width, points[:, 1])))
     outline = cv.approxPolyDP(points[:end + 1].astype(np.float32).reshape(-1, 1, 2), SIMPLIFY, False).reshape(-1, 2)
     return outline.astype(float), float(np.ptp(top[:, 1]) * scale)
@@ -96,7 +96,7 @@ def main(pdf_dir, output):
             outline, depth = extract(svg, width)
             profiles[f"corpo{number}"] = {"name": f"Corpo {number}", "depth": round(depth, 2),
                                           "outline": np.round(outline, 3).tolist()}
-            print(f"Corpo {number}: {len(outline)} vertici, altezza {outline[:, 1].max():.2f} mm, profondità {depth:.2f} mm")
+            print(f"Corpo {number}: {len(outline)} vertices, height {outline[:, 1].max():.2f} mm, depth {depth:.2f} mm")
     Path(output).write_text(json.dumps(profiles, separators=(",", ":")) + "\n")
 
 

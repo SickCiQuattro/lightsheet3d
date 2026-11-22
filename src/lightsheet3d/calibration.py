@@ -9,18 +9,18 @@ def _homogeneous(points):
 
 
 def project(P, world):
-    """Proietta punti oggetto (n, 3) in pixel (n, 2) con la matrice P (3, 4)."""
+    """Project object points (n, 3) to pixels (n, 2) with the matrix P (3, 4)."""
     h = _homogeneous(np.asarray(world, np.float64)) @ P.T
     return h[:, :2] / h[:, 2:]
 
 
 def reprojection_errors(P, world, image):
-    """Distanza euclidea in pixel tra punti misurati e punti ri-proiettati."""
+    """Euclidean distance in pixels between measured and reprojected points."""
     return np.linalg.norm(project(P, world) - np.asarray(image, np.float64).reshape(-1, 2), axis=1)
 
 
 def _normalisation(points):
-    """Matrice di similarità che porta i punti a media 0 e deviazione standard 1."""
+    """Similarity matrix that brings the points to mean 0 and standard deviation 1."""
     mean, scale = points.mean(axis=0), points.std()
     T = np.eye(points.shape[1] + 1)
     T[:-1, :-1] *= 1 / scale
@@ -29,11 +29,11 @@ def _normalisation(points):
 
 
 def estimate_projection_matrix(world, image):
-    """DLT normalizzata (Hartley): stima P (3, 4) da corrispondenze 3D-2D.
+    """Normalised DLT (Hartley): estimate P (3, 4) from 3D-2D correspondences.
 
-    I punti vanno normalizzati: con coordinate in mm e pixel i termini di Q
-    differiscono di 5 ordini di grandezza e il sistema è mal condizionato.
-    P è scalata con |P[2, :3]| = 1 e segno tale che i punti stiano davanti.
+    The points must be normalised: with coordinates in mm and pixels the terms of Q
+    differ by 5 orders of magnitude and the system is ill-conditioned.
+    P is scaled so that |P[2, :3]| = 1, with the sign chosen so the points lie in front.
     """
     world = np.asarray(world, np.float64)
     image = np.asarray(image, np.float64).reshape(-1, 2)
@@ -51,7 +51,7 @@ def estimate_projection_matrix(world, image):
     return P if (_homogeneous(world) @ P[2]).mean() > 0 else -P
 
 
-_RADIAL_SCALE = 1000.0  # px: rende k1, k2 numeri di ordine 0.1
+_RADIAL_SCALE = 1000.0  # px: makes k1, k2 numbers of order 0.1
 
 
 def _radial_factor(points, center, k):
@@ -60,12 +60,12 @@ def _radial_factor(points, center, k):
 
 
 def distort_points(ideal, center, k):
-    """Applica la distorsione radiale ai pixel ideali (n, 2)."""
+    """Apply radial distortion to the ideal pixels (n, 2)."""
     return center + (ideal - center) * _radial_factor(ideal, center, k)
 
 
 def undistort_points(distorted, center, k, iterations=20):
-    """Inverte `distort_points` per punto fisso."""
+    """Invert `distort_points` by fixed-point iteration."""
     ideal = distorted.copy()
     for _ in range(iterations):
         ideal = center + (distorted - center) / _radial_factor(ideal, center, k)
@@ -74,25 +74,25 @@ def undistort_points(distorted, center, k, iterations=20):
 
 @dataclass(frozen=True)
 class CameraModel:
-    P: np.ndarray        # (3, 4) proiezione ideale, |P[2, :3]| = 1
-    center: np.ndarray   # (2,) centro della distorsione radiale, px
-    k: np.ndarray        # coefficienti radiali
-    offsets: np.ndarray  # (viste, 2) spostamento laterale stimato del master, mm
-    views: np.ndarray    # (viste,) identificativo di ogni riga di `offsets`
-    rms: float           # px, sui punti di calibrazione
+    P: np.ndarray        # (3, 4) ideal projection, |P[2, :3]| = 1
+    center: np.ndarray   # (2,) centre of radial distortion, px
+    k: np.ndarray        # radial coefficients
+    offsets: np.ndarray  # (views, 2) estimated lateral shift of the master, mm
+    views: np.ndarray    # (views,) identifier of each row of `offsets`
+    rms: float           # px, on the calibration points
 
     def undistort(self, points):
         return undistort_points(points, self.center, self.k)
 
 
 def fit_camera(world, image, view_ids, image_size, n_radial=2, reference_view=0, f_scale=3.0):
-    """Stima congiunta di P e distorsione radiale dai punti di tutte le viste.
+    """Joint estimate of P and radial distortion from the points of all views.
 
-    Il master non si muove solo lungo z fra le viste (setup instabile): lo
-    spostamento laterale di ogni vista è un parametro di disturbo stimato,
-    con la vista di riferimento fissata a zero che definisce l'origine.
-    Gli identificativi delle viste sono le quote z (mm).
-    Funzione di costo robusta (soft L1) contro i centri mal rilevati.
+    The master does not move only along z between views (unstable setup): the
+    lateral shift of each view is an estimated nuisance parameter,
+    with the reference view fixed at zero defining the origin.
+    The view identifiers are the z heights (mm).
+    Robust cost function (soft L1) against badly detected centres.
     """
     world = np.asarray(world, np.float64)
     image = np.asarray(image, np.float64).reshape(-1, 2)
@@ -105,8 +105,8 @@ def fit_camera(world, image, view_ids, image_size, n_radial=2, reference_view=0,
     def unpack(x):
         offsets = np.zeros((len(views), 2))
         offsets[free] = x[14 + n_radial:].reshape(-1, 2)
-        # Una deriva degli offset lineare in z è indistinguibile da una piccola inclinazione dell'asse
-        # in P (stessi residui): si fissa togliendola, cioè assumendo che il master scorra lungo z.
+        # A drift of the offsets that is linear in z is indistinguishable from a small tilt of the axis
+        # in P (same residuals): it is fixed by removing it, i.e. assuming the master slides along z.
         offsets -= dz[:, None] * ((dz[:, None] * offsets).sum(axis=0) / (dz**2).sum())
         return x[:12].reshape(3, 4), x[12:14], x[14:14 + n_radial], offsets
 
@@ -130,7 +130,7 @@ def fit_camera(world, image, view_ids, image_size, n_radial=2, reference_view=0,
 
 
 def model_residuals(model, world, image, view_ids):
-    """Distanza in pixel fra punti misurati e punti predetti dal modello, con gli offset delle viste."""
+    """Distance in pixels between measured points and points predicted by the model, with the view offsets."""
     shifted = np.asarray(world, np.float64).copy()
     shifted[:, :2] += model.offsets[np.searchsorted(model.views, view_ids)]
     predicted = distort_points(project(model.P, shifted), model.center, model.k)
@@ -138,11 +138,11 @@ def model_residuals(model, world, image, view_ids):
 
 
 def fit_camera_robust(world, image, view_ids, image_size, outlier_factor=10.0, **kwargs):
-    """`fit_camera` con un secondo passo che scarta i centri sbagliati; ritorna (modello, inliers).
+    """`fit_camera` with a second pass that discards wrong centres; returns (model, inliers).
 
-    Un centro rilevato male (per esempio una colonna spuria al bordo dell'immagine) può avere
-    decine di pixel di residuo: la perdita robusta lo attenua ma non lo annulla. Si scartano i punti
-    con residuo oltre `outlier_factor` volte la mediana e si rifà il fit sugli altri.
+    A badly detected centre (for example a spurious column at the image edge) can have
+    tens of pixels of residual: the robust loss attenuates it but does not remove it. Points
+    with residual above `outlier_factor` times the median are discarded and the fit is redone on the rest.
     """
     world = np.asarray(world, np.float64)
     image = np.asarray(image, np.float64).reshape(-1, 2)

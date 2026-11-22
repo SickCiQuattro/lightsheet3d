@@ -1,4 +1,4 @@
-"""Regressione sui dati reali del repo: il profilo del Corpo 6 deve rispettare il disegno."""
+"""Regression on the repo's real data: the profile of Corpo 6 must match the drawing."""
 from pathlib import Path
 
 import numpy as np
@@ -21,7 +21,7 @@ def calibration():
 def test_camera_uses_only_views_up_to_the_main_target(calibration):
     camera, _ = calibration
 
-    assert sorted(set(camera.view_ids)) == [300, 310, 320, 330, 340, 350]  # 300 era scartata dal blob detector di default
+    assert sorted(set(camera.view_ids)) == [300, 310, 320, 330, 340, 350]  # 300 used to be discarded by the default blob detector
     assert camera.model.rms < 10
 
 
@@ -41,7 +41,7 @@ def test_corpo6_peak_heights_match_the_drawing(calibration):
     y = X[:, 1]
     peaks = measure_peaks(y, level_to_plate(y, PLATE_Z - X[:, 2]), prominence=6)
 
-    assert np.allclose([p.height for p in peaks], [45, 25, 45], atol=2.0)  # disegno: 45 / 25 / 45 mm
+    assert np.allclose([p.height for p in peaks], [45, 25, 45], atol=2.0)  # drawing: 45 / 25 / 45 mm
 
 
 @pytest.mark.parametrize("image, solid", [("30o34", CORPO6), ("30o3", CORPO5)])

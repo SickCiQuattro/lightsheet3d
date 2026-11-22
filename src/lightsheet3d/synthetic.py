@@ -1,8 +1,8 @@
-"""Immagini sintetiche di uno scanner a lama di luce con geometria nota (verità a terra).
+"""Synthetic images of a light-sheet scanner with known geometry (ground truth).
 
-La scena di default ha i parametri stimati sul setup reale (camera a circa 330 mm dal master,
-focale 1955 px, lama inclinata nel piano x-z). Le immagini hanno gli stessi nomi e lo stesso
-formato di quelle reali, quindi la pipeline le legge senza modifiche.
+The default scene has parameters estimated on the real setup (camera about 330 mm from the master,
+focal length 1955 px, sheet tilted in the x-z plane). The images have the same names and the same
+format as the real ones, so the pipeline reads them unchanged.
 """
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,10 +17,10 @@ from .measure import level_to_plate
 from .pipeline import PLATE_Z, Z_BASE, Z_STEP, calibrate_camera, calibrate_light_plane, scan_points
 from .solids import SOLIDS, align, distances, nominal_curve
 
-FOCAL = 1955.0                   # px, per la dimensione apparente dei cerchi
-LARGE = {(0.0, 0.0), (60.0, 0.0), (0.0, 40.0)}  # "L" di cerchi grandi: origine, +x, +y (mm)
-MARGIN = 90                      # px dal bordo entro cui un cerchio è considerato visibile
-VIEWS = range(310, 351, 10)      # z (mm) delle viste del master, come nel setup reale
+FOCAL = 1955.0                   # px, for the apparent size of the circles
+LARGE = {(0.0, 0.0), (60.0, 0.0), (0.0, 40.0)}  # "L" of large circles: origin, +x, +y (mm)
+MARGIN = 90                      # px from the edge within which a circle is considered visible
+VIEWS = range(310, 351, 10)      # z (mm) of the master views, as in the real setup
 
 
 @dataclass(frozen=True)
@@ -28,25 +28,25 @@ class Scene:
     P: np.ndarray = field(default_factory=lambda: np.array([[1948.493, -105.702, 747.635, 45495.232],
                                                             [119.224, 1960.919, 338.122, 93671.343],
                                                             [-0.00323, 0.01342, 0.9999, -17.508]]))
-    center: np.ndarray = field(default_factory=lambda: np.array([875.559, 662.222]))  # centro distorsione radiale, px
-    k: np.ndarray = field(default_factory=lambda: np.array([-0.10885, 0.01054]))     # coefficienti radiali
-    plane: np.ndarray = field(default_factory=lambda: np.array([2.89308, 0.0081, 216.731]))  # lama: z = A x + B y + C
+    center: np.ndarray = field(default_factory=lambda: np.array([875.559, 662.222]))  # radial distortion centre, px
+    k: np.ndarray = field(default_factory=lambda: np.array([-0.10885, 0.01054]))     # radial coefficients
+    plane: np.ndarray = field(default_factory=lambda: np.array([2.89308, 0.0081, 216.731]))  # sheet: z = A x + B y + C
     image_size: tuple = (2130, 1420)
-    pitch: float = 20.0                                # mm fra i cerchi del master
+    pitch: float = 20.0                                # mm between the master's circles
 
     def to_pixels(self, world):
         return distort_points(project(self.P, np.asarray(world, np.float64)), self.center, self.k)
 
     def sheet_x(self, y, z):
-        """x (mm) in cui la lama passa per (y, z)."""
+        """x (mm) at which the sheet passes through (y, z)."""
         a, b, c = self.plane
         return (z - b * y - c) / a
 
     def visible_grid(self):
-        """Coordinate (mm) di righe e colonne di un blocco di master interamente visibile a ogni z.
+        """Coordinates (mm) of rows and columns of a master block fully visible at every z.
 
-        Parte dalla griglia completa e toglie di volta in volta la riga o la colonna con più
-        cerchi fuori campo (o troppo vicini al bordo).
+        Starts from the full grid and each time removes the row or column with the most
+        circles out of the field (or too close to the edge).
         """
         w, h = self.image_size
         xs, ys = np.arange(-140, 241, self.pitch), np.arange(-100, 121, self.pitch)
@@ -70,12 +70,12 @@ def _blank(scene):
 
 
 def _sub(v):
-    """Coordinata subpixel (4 bit frazionari) per le primitive di OpenCV."""
+    """Subpixel coordinate (4 fractional bits) for the OpenCV primitives."""
     return round(v * 16)
 
 
 def render_master(scene, z, noise_px=0.0, rng=None):
-    """Master di taratura a quota `z`: cerchi neri su carta, con la "L" di cerchi grandi."""
+    """Calibration master at height `z`: black circles on paper, with the "L" of large circles."""
     rng = rng or np.random.default_rng(0)
     image = _blank(scene)
     xs, ys = scene.visible_grid()
@@ -88,10 +88,10 @@ def render_master(scene, z, noise_px=0.0, rng=None):
 
 
 def _draw_sheet(scene, world, noise_px, rng, blur=0.0, grain=0.0):
-    """Lama (saturata su tutti i canali, come nelle foto reali) lungo la curva 3D `world`.
+    """Sheet (saturated on all channels, as in the real photos) along the 3D curve `world`.
 
-    `blur` (px, deviazione standard) sfuma la lama come l'ottica reale; `grain` (livelli di grigio)
-    aggiunge rumore gaussiano alle intensità. Entrambi lasciano la geometria intatta.
+    `blur` (px, standard deviation) blurs the sheet like real optics; `grain` (grey levels)
+    adds Gaussian noise to the intensities. Both leave the geometry intact.
     """
     image = _blank(scene)
     uv = scene.to_pixels(world) + rng.normal(0, noise_px, (len(world), 2))
@@ -104,14 +104,14 @@ def _draw_sheet(scene, world, noise_px, rng, blur=0.0, grain=0.0):
 
 
 def render_sheet_on_master(scene, z, noise_px=0.0, rng=None, blur=0.0, grain=0.0):
-    """Lama sul master piano a quota `z`."""
+    """Sheet on the flat master at height `z`."""
     rng = rng or np.random.default_rng(0)
     y = np.arange(-130, 151, 1.0)
     return _draw_sheet(scene, np.column_stack([scene.sheet_x(y, z), y, np.full(len(y), float(z))]), noise_px, rng, blur, grain)
 
 
 def render_scan(scene, solid, sign=1, shift=0.0, noise_px=0.0, rng=None, blur=0.0, grain=0.0):
-    """Lama su un solido appoggiato al piano z = PLATE_Z; il profilo nominale è la verità a terra."""
+    """Sheet on a solid resting on the plane z = PLATE_Z; the nominal profile is the ground truth."""
     rng = rng or np.random.default_rng(0)
     yn, hn = nominal_curve(solid, sign, shift)
     y = np.concatenate([[yn[0] - 60], yn, [yn[-1] + 60]])
@@ -123,7 +123,7 @@ def render_scan(scene, solid, sign=1, shift=0.0, noise_px=0.0, rng=None, blur=0.
 
 
 def write_dataset(scene, solid, out_dir, sign=1, shift=-57.0, noise_px=0.0, seed=0, blur=0.0, grain=0.0):
-    """Scrive un dataset con la struttura di `data/`; restituisce (cartella, nome della scansione)."""
+    """Write a dataset with the structure of `data/`; returns (folder, scan name)."""
     out, rng = Path(out_dir), np.random.default_rng(seed)
     names = {"camera_calibration": "{n}.jpg", "light_plane_calibration": "{n}l.jpg"}
     for sub in (*names, "scans"):
@@ -137,18 +137,18 @@ def write_dataset(scene, solid, out_dir, sign=1, shift=-57.0, noise_px=0.0, seed
     image = render_scan(scene, solid, sign, shift, noise_px, rng, blur, grain)
     cv.imwrite(str(out / "scans" / scan), image, [cv.IMWRITE_JPEG_QUALITY, 95])
     key = next((k for k, v in SOLIDS.items() if v is solid), None)
-    if key:  # il manifest con la verità: la scansione è di questo solido
+    if key:  # the manifest with the truth: the scan is of this solid
         (out / "scans.csv").write_text(f"file,solid,role\n{scan},{key},test\n")
     Dataset(root=out, image_size=scene.image_size, pitch_mm=scene.pitch, manifest="scans.csv" if key else None).write()
     return out, scan
 
 
 def evaluate(solid, work_dir, noise_px=0.0, shift=-57.0, seed=0, scene=None, blur=0.0, grain=0.0, extract=laser_centroids):
-    """Genera un dataset, esegue la pipeline e confronta il profilo con la verità a terra.
+    """Generate a dataset, run the pipeline and compare the profile with the ground truth.
 
-    Restituisce un dizionario con `camera`, `light`, il profilo (`y`, `h`), il verso e la traslazione
-    trovati da `align` e la distanza (mm) di ogni punto dal profilo nominale (`dist`). `extract` è la
-    funzione che trova la lama in un'immagine (`laser_centroids` o `laser_steger`).
+    Returns a dictionary with `camera`, `light`, the profile (`y`, `h`), the direction and shift
+    found by `align` and the distance (mm) of each point from the nominal profile (`dist`). `extract` is the
+    function that finds the sheet in an image (`laser_centroids` or `laser_steger`).
     """
     scene = scene or Scene()
     root, scan = write_dataset(scene, solid, work_dir, shift=shift, noise_px=noise_px, seed=seed, blur=blur, grain=grain)

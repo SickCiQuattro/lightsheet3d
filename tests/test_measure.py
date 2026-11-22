@@ -2,7 +2,7 @@ import numpy as np
 
 from lightsheet3d.measure import level_to_plate, measure_peaks
 
-# Vertici (y mm, altezza mm): piano a 0, gradino a 15, due picchi con fianchi noti.
+# Vertices (y mm, height mm): plane at 0, step at 15, two peaks with known flanks.
 ANGLES = {"left1": 60.0, "right1": 75.0, "left2": 65.0, "right2": 55.0}
 
 
@@ -45,7 +45,7 @@ def test_flank_angles_are_within_two_degrees():
 
 
 def test_level_to_plate_removes_a_tilted_base():
-    y, h, _ = synthetic_profile(noise=0.2, tilt=0.03)  # base inclinata di ~3 mm su 100 mm
+    y, h, _ = synthetic_profile(noise=0.2, tilt=0.03)  # base tilted by ~3 mm over 100 mm
 
     leveled = level_to_plate(y, h)
 
@@ -61,11 +61,11 @@ def test_no_peaks_in_a_flat_profile():
 
 
 def test_jittery_vertical_edge_is_a_single_peak():
-    # bordo quasi verticale: molti punti nello stesso decimo di mm con altezze sparse
+    # nearly vertical edge: many points within the same tenth of a mm with scattered heights
     rng = np.random.default_rng(3)
     y = np.arange(-20, 20, 0.2)
     h = np.zeros_like(y)
-    h[(y > -10) & (y < 0)] = (y[(y > -10) & (y < 0)] + 10) * 4.0  # salita fino a 40
+    h[(y > -10) & (y < 0)] = (y[(y > -10) & (y < 0)] + 10) * 4.0  # rise up to 40
     h[(y >= 0) & (y < 3)] = 40.0
     edge_y = rng.uniform(3.0, 3.4, 60)
     edge_h = rng.uniform(2, 38, 60)
@@ -75,7 +75,7 @@ def test_jittery_vertical_edge_is_a_single_peak():
 
 
 def sharp_peak(apex=45.0, cut=0.0, left=60.0, right=75.0, step=0.1):
-    """Picco con apice troncato di `cut` mm, come fa il baricentro della lama su una cima acuta."""
+    """Peak with the apex truncated by `cut` mm, as the sheet centroid does on a sharp top."""
     y = np.arange(-80, 80, step)
     h = np.clip(np.minimum(apex + y * np.tan(np.radians(left)), apex - y * np.tan(np.radians(right))), 0, None)
     return y, np.minimum(h, apex - cut)
@@ -86,14 +86,14 @@ def test_truncated_sharp_apex_is_recovered_from_the_flanks():
 
     (peak,) = measure_peaks(y, h, prominence=6)
 
-    assert abs(peak.height - 45.0) < 0.25  # il massimo grezzo darebbe 44.2
+    assert abs(peak.height - 45.0) < 0.25  # the raw maximum would give 44.2
 
 
 def test_flat_top_height_is_not_inflated_by_the_flank_intersection():
     y = np.arange(-60, 60, 0.1)
     h = np.clip(np.minimum.reduce([35 + (y + 4) * np.tan(np.radians(65)), 35 - (y - 4) * np.tan(np.radians(65)),
-                                   np.full_like(y, 35.0)]), 0, None)  # piano largo 8 mm
+                                   np.full_like(y, 35.0)]), 0, None)  # plateau 8 mm wide
 
     (peak,) = measure_peaks(y, h, prominence=6)
 
-    assert abs(peak.height - 35.0) < 0.2  # i fianchi si incrociano molto più in alto del piano
+    assert abs(peak.height - 35.0) < 0.2  # the flanks cross much higher than the plateau

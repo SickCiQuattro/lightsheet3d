@@ -1,4 +1,4 @@
-"""Sensibilità del risultato alla calibrazione: si ricalibra escludendo una vista alla volta (jackknife)."""
+"""Sensitivity of the result to the calibration: recalibrate leaving out one view at a time (jackknife)."""
 from dataclasses import dataclass
 
 import numpy as np
@@ -11,11 +11,11 @@ from .solids import align, distances, nominal_curve
 
 @dataclass(frozen=True)
 class Run:
-    excluded: int | None   # quota della vista esclusa; None = calibrazione completa
+    excluded: int | None   # height of the excluded view; None = full calibration
     plane: np.ndarray      # (A, B, C)
     camera_rms: float      # px
-    median: float          # mm, distanza mediana dal profilo nominale (punti sul solido)
-    heights: np.ndarray    # mm, altezza dei picchi; nan se non se ne trovano quanti ne ha il solido
+    median: float          # mm, median distance from the nominal profile (points on the solid)
+    heights: np.ndarray    # mm, peak heights; nan if as many as the solid has are not found
 
 
 def _run(model, laser_dir, image, solid, excluded, prominence):
@@ -32,10 +32,10 @@ def _run(model, laser_dir, image, solid, excluded, prominence):
 
 
 def leave_one_view_out(camera, laser_dir, image, solid, prominence=6.0, image_size=(2130, 1420)):
-    """Calibrazione completa più una per ogni vista del master (tranne quella di riferimento) esclusa.
+    """Full calibration plus one for each master view (except the reference one) left out.
 
-    `camera` è il risultato di `calibrate_camera`: i centri già rilevati si riusano, quindi ogni
-    ricalibrazione costa il solo fit. La vista esclusa lo è dalla camera e dal piano della lama.
+    `camera` is the result of `calibrate_camera`: the centres already detected are reused, so each
+    recalibration costs only the fit. The excluded view is left out of both the camera and the sheet plane.
     """
     runs = [_run(camera.model, laser_dir, image, solid, None, prominence)]
     for z in sorted({int(v) for v in camera.view_ids} - {PLATE_Z}):
@@ -46,7 +46,7 @@ def leave_one_view_out(camera, laser_dir, image, solid, prominence=6.0, image_si
 
 
 def jackknife_se(values):
-    """Errore standard jackknife di una statistica calcolata lasciando fuori un elemento alla volta."""
+    """Jackknife standard error of a statistic computed leaving out one element at a time."""
     values = np.asarray(values, np.float64)
     n = len(values)
     return float(np.sqrt((n - 1) / n * ((values - values.mean()) ** 2).sum()))

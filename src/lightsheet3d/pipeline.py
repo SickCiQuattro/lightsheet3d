@@ -1,4 +1,4 @@
-"""Dalle immagini grezze alle misure: calibrazione camera, piano della lama, scansione."""
+"""From raw images to measurements: camera calibration, sheet plane, scan."""
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,32 +10,32 @@ from .grid import build_object_points, find_first_valid_circles_grid, orient_gri
 from .laser import laser_centroids
 from .lightplane import fit_plane, ray_plane_point, triangulate
 
-Z_BASE = 50          # mm, altezza della base del supporto
-Z_STEP = 10          # mm per unità del numero nel nome file
-PATTERN_MAX = (21, 14)  # colonne, righe massime della griglia di cerchi
+Z_BASE = 50          # mm, height of the support base
+Z_STEP = 10          # mm per unit of the number in the file name
+PATTERN_MAX = (21, 14)  # maximum columns, rows of the circle grid
 PATTERN_MIN = 9
-PLATE_Z = 350        # mm, piano di appoggio dei solidi (immagini "30...")
+PLATE_Z = 350        # mm, plane the solids rest on ("30..." images)
 
 
 def z_from_name(path):
-    """z (mm) dal nome file, ad esempio 27l.jpg -> 27 * 10 + 50."""
+    """z (mm) from the file name, for example 27l.jpg -> 27 * 10 + 50."""
     return int(Path(path).name[:2]) * Z_STEP + Z_BASE
 
 
 @dataclass(frozen=True)
 class CameraCalibration:
     model: CameraModel
-    world: np.ndarray     # (n, 3) punti oggetto di tutte le viste
-    image: np.ndarray     # (n, 2) centri misurati, pixel grezzi
-    view_ids: np.ndarray  # (n,) z della vista di ogni punto
-    skipped: tuple        # file senza pattern o senza origine riconoscibile
-    inliers: np.ndarray   # (n,) False per i centri scartati come errati prima del fit finale
+    world: np.ndarray     # (n, 3) object points of all views
+    image: np.ndarray     # (n, 2) measured centres, raw pixels
+    view_ids: np.ndarray  # (n,) z of the view of each point
+    skipped: tuple        # files without a pattern or without a recognisable origin
+    inliers: np.ndarray   # (n,) False for the centres discarded as wrong before the final fit
 
 
 def calibrate_camera(target_dir, z_max=PLATE_Z, pitch=20.0, image_size=(2130, 1420), z_of=z_from_name,
                      pattern_max=PATTERN_MAX, pattern_min=PATTERN_MIN):
-    """Modello camera dai master di taratura con z <= z_max (le viste oltre il master principale
-    non sono usate: il setup si è mosso fra gli scatti)."""
+    """Camera model from the calibration masters with z <= z_max (views beyond the main master
+    are not used: the setup moved between shots)."""
     world, image, view_ids, skipped = [], [], [], []
     for path in sorted(Path(target_dir).glob("*.jpg")):
         z = z_of(path)
@@ -60,15 +60,15 @@ def calibrate_camera(target_dir, z_max=PLATE_Z, pitch=20.0, image_size=(2130, 14
 
 @dataclass(frozen=True)
 class LightPlaneCalibration:
-    plane: np.ndarray          # (A, B, C) di z = A x + B y + C, fit sui soli punti di calibrazione
-    points: np.ndarray         # (n, 3) punti della lama nello spazio oggetto
-    is_validation: np.ndarray  # (n,) True per i punti esclusi dal fit
-    view_ids: np.ndarray       # (n,) quota nominale (dal nome file) della vista di ogni punto
+    plane: np.ndarray          # (A, B, C) of z = A x + B y + C, fitted on the calibration points only
+    points: np.ndarray         # (n, 3) points of the sheet in object space
+    is_validation: np.ndarray  # (n,) True for the points excluded from the fit
+    view_ids: np.ndarray       # (n,) nominal height (from the file name) of the view of each point
 
 
 def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.1, seed=0, exclude=(), extract=laser_centroids,
                            z_of=z_from_name):
-    """Piano della lama dai punti delle immagini con la lama sul master a z noto (viste in `exclude` escluse)."""
+    """Sheet plane from the points of the images with the sheet on the master at known z (views in `exclude` left out)."""
     points, view_ids = [], []
     for path in sorted(Path(lama_dir).glob("*.jpg")):
         z = z_of(path)
@@ -84,6 +84,6 @@ def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.
 
 
 def scan_points(image_path, model, plane, extract=laser_centroids):
-    """Punti oggetto (n, 3) in mm del profilo illuminato dalla lama in un'immagine grezza."""
+    """Object points (n, 3) in mm of the profile lit by the sheet in a raw image."""
     uv = model.undistort(extract(cv.imread(str(image_path))))
     return triangulate(model.P, uv, plane)

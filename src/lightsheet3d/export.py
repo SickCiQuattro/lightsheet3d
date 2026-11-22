@@ -1,13 +1,13 @@
-"""Esportazione dei punti misurati in formati leggibili da MeshLab, CloudCompare e Open3D."""
+"""Export of the measured points in formats readable by MeshLab, CloudCompare and Open3D."""
 from pathlib import Path
 
 import numpy as np
 
 
 def write_ply(path, points, colors=None):
-    """Scrive una nuvola di punti (n, 3) in PLY ASCII; `colors` (n, 3) uint8 opzionali.
+    """Write a point cloud (n, 3) as ASCII PLY; `colors` (n, 3) uint8 is optional.
 
-    ASCII e non binario: i file sono di poche decine di kB e si leggono con un editor di testo.
+    ASCII rather than binary: the files are a few tens of kB and can be read with a text editor.
     """
     points = np.asarray(points, np.float64).reshape(-1, 3)
     header = ["ply", "format ascii 1.0", f"element vertex {len(points)}",
@@ -16,7 +16,7 @@ def write_ply(path, points, colors=None):
     if colors is not None:
         colors = np.asarray(colors)
         if colors.shape != points.shape:
-            raise ValueError(f"colors {colors.shape} non corrisponde a points {points.shape}")
+            raise ValueError(f"colors {colors.shape} does not match points {points.shape}")
         header += ["property uchar red", "property uchar green", "property uchar blue"]
     header.append("end_header")
     with Path(path).open("w") as f:
@@ -29,7 +29,7 @@ def write_ply(path, points, colors=None):
 
 
 def read_ply(path):
-    """Legge un PLY ASCII scritto da `write_ply`: (punti (n, 3), colori (n, 3) o None)."""
+    """Read an ASCII PLY written by `write_ply`: (points (n, 3), colors (n, 3) or None)."""
     lines = Path(path).read_text().splitlines()
     end = lines.index("end_header")
     n = next(int(line.split()[-1]) for line in lines[:end] if line.startswith("element vertex"))
@@ -38,6 +38,6 @@ def read_ply(path):
 
 
 def distance_colors(distance, vmax=2.0):
-    """Colori RGB (uint8) da verde (0 mm) a rosso (`vmax` mm o più) per una distanza in mm."""
+    """RGB colors (uint8) from green (0 mm) to red (`vmax` mm or more) for a distance in mm."""
     t = np.clip(np.asarray(distance, np.float64) / vmax, 0, 1)
     return np.round(np.column_stack([255 * t, 255 * (1 - t), np.zeros_like(t)])).astype(np.uint8)

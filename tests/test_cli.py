@@ -67,7 +67,7 @@ def test_missing_calibration_is_reported_without_a_traceback(tmp_path, capsys):
 def test_unsupported_calibration_version_is_rejected(tmp_path):
     (tmp_path / "old.json").write_text('{"version": 0}')
 
-    with pytest.raises(ValueError, match="versione"):
+    with pytest.raises(ValueError, match="version"):
         Calibration.load(tmp_path / "old.json")
 
 

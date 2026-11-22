@@ -22,7 +22,7 @@ def test_z_comes_from_the_first_two_digits_of_the_name(name, z):
 
 
 def test_a_name_without_digits_is_rejected():
-    with pytest.raises(ValueError, match="due cifre"):
+    with pytest.raises(ValueError, match="two digits"):
         Dataset(root=Path(".")).z_of("target.jpg")
 
 
