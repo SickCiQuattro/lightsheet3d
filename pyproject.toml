@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 packages = ["src/lightsheet3d"]
 
 [project]
-name = "light-sheet-3d-scanner"
+name = "lightsheet3d"
 version = "0.1.0"
 description = "Light-sheet 3D scanner: camera calibration, laser-plane calibration and profile triangulation."
 readme = "README.md"

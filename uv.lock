@@ -632,7 +632,7 @@ wheels = [
 ]
 
 [[package]]
-name = "light-sheet-3d-scanner"
+name = "lightsheet3d"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
