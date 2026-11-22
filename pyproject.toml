@@ -18,6 +18,9 @@ dependencies = [
     "matplotlib>=3.11.2",
 ]
 
+[project.scripts]
+lightsheet3d = "lightsheet3d.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=9",

@@ -105,7 +105,24 @@ uv run pytest        # about 30 s: includes the synthetic end-to-end tests and t
 
 The notebooks open with the project kernel (`ipykernel` is a dev dependency), for example from VS Code. JupyterLab is not included: `pyyaml` has no wheel for Python 3.15 yet.
 
-From the raw images to the peaks of a solid:
+Command line: calibrate once, then measure as many scans as you want.
+
+```bash
+uv run lightsheet3d calibrate data/camera_calibration data/light_plane_calibration -o calibration.json
+uv run lightsheet3d scan calibration.json data/scans/30o34.jpg --solid corpo6 --ply corpo6.ply
+```
+
+```text
+data/scans/30o34.jpg: 1390 points
+  peak 1: y =  -29.9 mm  height  44.3 mm  flanks l/r  61.6° /   nan°
+  peak 2: y =   -7.4 mm  height  23.9 mm  flanks l/r  71.9° /  61.2°
+  peak 3: y =   11.7 mm  height  44.5 mm  flanks l/r  82.8° /  54.8°
+  comparison with Corpo 6: median distance 0.59 mm, 90th percentile 1.63 mm (564 points on the solid)
+```
+
+`lightsheet3d synthetic DIR --noise 0.5` writes a synthetic dataset with the same layout as `data/`, so the three commands also run on data with a known answer.
+
+The same steps from Python:
 
 ```python
 from lightsheet3d.measure import level_to_plate, measure_peaks
@@ -139,6 +156,9 @@ src/lightsheet3d/
   solids.py       nominal profiles, alignment and distance to the measured profile
   report.py       measured vs nominal plot
   synthetic.py    synthetic images with known geometry and an end-to-end evaluation
+  export.py       PLY export of the measured points
+  storage.py      calibration saved to and loaded from JSON
+  cli.py          the `lightsheet3d` command
   pipeline.py     from raw images to measurements
 tests/            unit tests, synthetic end-to-end tests and regressions on the real images
 notebooks/        four notebooks with saved outputs (the fourth validates on synthetic data)
