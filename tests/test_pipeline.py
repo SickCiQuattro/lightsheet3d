@@ -7,6 +7,7 @@ import pytest
 from lightsheet3d.lightplane import plane_errors
 from lightsheet3d.measure import level_to_plate, measure_peaks
 from lightsheet3d.pipeline import PLATE_Z, calibrate_camera, calibrate_light_plane, scan_points
+from lightsheet3d.solids import CORPO5, CORPO6, align, distances, nominal_curve
 
 IMAGES = Path(__file__).parents[1] / "images"
 
@@ -41,3 +42,16 @@ def test_corpo6_peak_heights_match_the_drawing(calibration):
     peaks = measure_peaks(y, level_to_plate(y, PLATE_Z - X[:, 2]), prominence=6)
 
     assert np.allclose([p.height for p in peaks], [45, 25, 45], atol=2.0)  # disegno: 45 / 25 / 45 mm
+
+
+@pytest.mark.parametrize("image, solid", [("30o34", CORPO6), ("30o3", CORPO5)])
+def test_measured_profile_follows_the_nominal_one(calibration, image, solid):
+    camera, lightplane = calibration
+    X = scan_points(IMAGES / "oggetto" / f"{image}.jpg", camera.model, lightplane.plane)
+    y, h = X[:, 1], level_to_plate(X[:, 1], PLATE_Z - X[:, 2])
+
+    sign, shift = align(solid, y, h)
+    yn, _ = nominal_curve(solid, sign, shift)
+    on_solid = (y > yn[1]) & (y < yn[-2])
+
+    assert np.median(distances(solid, sign, shift, y[on_solid], h[on_solid])) < 1.0
