@@ -1,11 +1,12 @@
-"""Profili nominali dei solidi di taratura, ricavati dalle quote dei disegni del corso.
+"""Profili nominali dei solidi di taratura, ricavati dai disegni tecnici del corso.
 
-Ogni profilo parte dallo spigolo in basso a sinistra (x = 0, h = 0) e procede verso destra;
-x lungo il solido e h sopra il piano di appoggio sono in mm. I fianchi sono dati dalla loro
-inclinazione rispetto all'orizzontale (180° meno l'angolo esterno quotato nel disegno).
+I vertici stanno in `profiles.json`, generato da `scripts/extract_drawing_profiles.py` leggendo il profilo
+frontale vettoriale dei PDF (archi compresi). Ogni profilo parte dallo spigolo in basso a sinistra
+(x = 0, h = 0) e procede verso destra; x lungo il solido e h sopra il piano di appoggio sono in mm.
 """
+import json
 from dataclasses import dataclass
-from math import radians, tan
+from pathlib import Path
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -14,21 +15,11 @@ from scipy.spatial import cKDTree
 PAD = 10.0  # mm di piano di appoggio (h = 0) da ciascun lato, per riconoscere anche i picchi di bordo
 
 
-def _rise(h, deg):
-    """Spostamento orizzontale di un fianco di inclinazione `deg` che sale di `h` mm."""
-    return h / tan(radians(deg))
-
-
-def _walk(steps):
-    pts = np.cumsum([(0.0, 0.0), *steps], axis=0)
-    return pts
-
-
 @dataclass(frozen=True)
 class Solid:
     name: str
     outline: np.ndarray  # (n, 2) x, h dei vertici, da sinistra a destra
-    depth: float = 50.0  # mm, estrusione del solido lungo x (dai disegni: 50 per il Corpo 6, 45 per il Corpo 5)
+    depth: float = 50.0  # mm, estrusione del solido lungo x (50 in tutti i disegni)
 
     @property
     def width(self):
@@ -43,24 +34,13 @@ class Solid:
         return [(float(c), float(h[i])) for c, i in zip(centre, idx)]
 
 
-# Corpo 6 (SDV3D_Corpo6): 100 mm, gradini laterali di 10 e 5 mm, picchi 45 / 25 / 45 mm.
-CORPO6 = Solid("Corpo 6", _walk([
-    (0, 10), (5, 0), (0, 5), (5, 0),                    # gradino sinistro, fondo a h = 15
-    (_rise(30, 60), 30), (_rise(30, 75), -30), (10, 0),
-    (_rise(10.05, 70), 10.05), (_rise(10.05, 65), -10.05), (10, 0),
-    (_rise(30, 80), 30), (_rise(30, 55), -30),
-    (5, 0), (0, -10), (5, 0), (0, -5),                  # gradino destro, fino al piano
-]))
+def _load():
+    data = json.loads((Path(__file__).parent / "profiles.json").read_text())
+    return {key: Solid(v["name"], np.array(v["outline"]), v["depth"]) for key, v in data.items()}
 
-# Corpo 5 (SDV3D_Corpo5): 75 mm, tre piani di 8 mm a 35 / 30 / 45 mm.
-CORPO5 = Solid("Corpo 5", _walk([
-    (0, 35), (8, 0), (6.85, -6.85 * tan(radians(75))), (11.87, 11.87 * tan(radians(60))), (8, 0),
-    (11.38, -11.38 * tan(radians(65))), (6.95, 6.95 * tan(radians(80))), (8, 0),
-    (13.95, -13.95 * tan(radians(70))),
-]))
-CORPO5 = Solid(CORPO5.name, np.vstack([CORPO5.outline, [CORPO5.outline[-1, 0], 0.0]]), depth=45.0)
 
-SOLIDS = {"corpo5": CORPO5, "corpo6": CORPO6}
+SOLIDS = _load()
+CORPO1, CORPO2, CORPO3, CORPO4, CORPO5, CORPO6 = (SOLIDS[f"corpo{n}"] for n in range(1, 7))
 
 
 def align(solid, y, h, clip=5.0, step=0.1, candidates=4, refine=1.0):
