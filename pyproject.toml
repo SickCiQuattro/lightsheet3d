@@ -8,7 +8,7 @@ packages = ["src/lightsheet3d"]
 [project]
 name = "light-sheet-3d-scanner"
 version = "0.1.0"
-description = "Scanner 3D a lama di luce: calibrazione camera, calibrazione del piano laser e triangolazione di profili."
+description = "Light-sheet 3D scanner: camera calibration, laser-plane calibration and profile triangulation."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

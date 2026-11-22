@@ -9,13 +9,13 @@ from lightsheet3d.measure import level_to_plate, measure_peaks
 from lightsheet3d.pipeline import PLATE_Z, calibrate_camera, calibrate_light_plane, scan_points
 from lightsheet3d.solids import CORPO5, CORPO6, align, distances, nominal_curve
 
-IMAGES = Path(__file__).parents[1] / "images"
+DATA = Path(__file__).parents[1] / "data"
 
 
 @pytest.fixture(scope="module")
 def calibration():
-    camera = calibrate_camera(IMAGES / "target")
-    return camera, calibrate_light_plane(IMAGES / "lama", camera.model)
+    camera = calibrate_camera(DATA / "camera_calibration")
+    return camera, calibrate_light_plane(DATA / "light_plane_calibration", camera.model)
 
 
 def test_camera_uses_only_views_up_to_the_main_target(calibration):
@@ -36,7 +36,7 @@ def test_light_plane_validation_error_is_below_one_millimetre(calibration):
 
 def test_corpo6_peak_heights_match_the_drawing(calibration):
     camera, lightplane = calibration
-    X = scan_points(IMAGES / "oggetto" / "30o34.jpg", camera.model, lightplane.plane)
+    X = scan_points(DATA / "scans" / "30o34.jpg", camera.model, lightplane.plane)
 
     y = X[:, 1]
     peaks = measure_peaks(y, level_to_plate(y, PLATE_Z - X[:, 2]), prominence=6)
@@ -47,7 +47,7 @@ def test_corpo6_peak_heights_match_the_drawing(calibration):
 @pytest.mark.parametrize("image, solid", [("30o34", CORPO6), ("30o3", CORPO5)])
 def test_measured_profile_follows_the_nominal_one(calibration, image, solid):
     camera, lightplane = calibration
-    X = scan_points(IMAGES / "oggetto" / f"{image}.jpg", camera.model, lightplane.plane)
+    X = scan_points(DATA / "scans" / f"{image}.jpg", camera.model, lightplane.plane)
     y, h = X[:, 1], level_to_plate(X[:, 1], PLATE_Z - X[:, 2])
 
     sign, shift = align(solid, y, h)

@@ -5,7 +5,7 @@ A 3D scanner built from a camera and a laser light sheet, written from scratch i
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Measured profiles of Corpo 6 and Corpo 5 over their nominal profiles](docs/figures/03_profili.png)
+![Measured profiles of Corpo 6 and Corpo 5 over their nominal profiles](docs/figures/profiles_vs_nominal.png)
 
 *Red: measured points. Dashed: nominal profile from the dimensions of the course drawings, aligned to the scan automatically. Plot labels are in Italian.*
 
@@ -46,17 +46,17 @@ flowchart LR
 
 | 1. Camera | 2. Sheet centroid | 3. Light plane |
 |---|---|---|
-| ![Circle grid with the detected centres and the origin](docs/figures/01_griglia_origine.png) | ![Laser sheet on a solid with the per-row centroid](docs/figures/02_estrazione_lama.png) | ![Light plane fitted on the calibration points](docs/figures/02_piano_lama.png) |
+| ![Circle grid with the detected centres and the origin](docs/figures/camera_grid_origin.png) | ![Laser sheet on a solid with the per-row centroid](docs/figures/laser_centroids.png) | ![Light plane fitted on the calibration points](docs/figures/light_plane.png) |
 | The master is a grid of circles with three larger ones in an "L"; the corner is the origin. | The centroid of the sheet is taken on every image row. | The plane is fitted on the calibration points and validated on held-out ones. |
 
-1. **Camera** ([notebook 1](notebooks/01_calibrazione_camera.ipynb)). One model (projection matrix, radial distortion and the master's lateral shift for each view) is fitted by least squares on all views. It works on points, not images, so distortion is never corrected twice.
-2. **Light sheet** ([notebook 2](notebooks/02_lama_di_luce.ipynb)). Each centroid is brought to object space by intersecting its ray with the plane at known `z`; the plane `z = Ax + By + C` is fitted by least squares and validated on held-out points and views.
-3. **Measurement** ([notebook 3](notebooks/03_misure.ipynb)). Every sheet pixel on a solid is triangulated with the camera and the plane; the profile is levelled on the support plane and peaks, heights and flank angles are extracted.
+1. **Camera** ([notebook 1](notebooks/01_camera_calibration.ipynb)). One model (projection matrix, radial distortion and the master's lateral shift for each view) is fitted by least squares on all views. It works on points, not images, so distortion is never corrected twice.
+2. **Light sheet** ([notebook 2](notebooks/02_light_plane_calibration.ipynb)). Each centroid is brought to object space by intersecting its ray with the plane at known `z`; the plane `z = Ax + By + C` is fitted by least squares and validated on held-out points and views.
+3. **Measurement** ([notebook 3](notebooks/03_measurements.ipynb)). Every sheet pixel on a solid is triangulated with the camera and the plane; the profile is levelled on the support plane and peaks, heights and flank angles are extracted.
 
 <details>
 <summary>Camera calibration residuals</summary>
 
-![Reprojection residuals: distribution and per view](docs/figures/01_residui_camera.png)
+![Reprojection residuals: distribution and per view](docs/figures/camera_residuals.png)
 
 </details>
 
@@ -77,10 +77,10 @@ From the raw images to the peaks of a solid:
 from lightsheet3d.measure import level_to_plate, measure_peaks
 from lightsheet3d.pipeline import PLATE_Z, calibrate_camera, calibrate_light_plane, scan_points
 
-camera = calibrate_camera("images/target")
-light = calibrate_light_plane("images/lama", camera.model)
+camera = calibrate_camera("data/camera_calibration")
+light = calibrate_light_plane("data/light_plane_calibration", camera.model)
 
-X = scan_points("images/oggetto/30o34.jpg", camera.model, light.plane)  # (n, 3) points in mm
+X = scan_points("data/scans/30o34.jpg", camera.model, light.plane)  # (n, 3) points in mm
 h = level_to_plate(X[:, 1], PLATE_Z - X[:, 2])                          # height above the support plane
 for p in measure_peaks(X[:, 1], h, prominence=6):
     print(f"peak at y = {p.y:6.1f} mm, height {p.height:4.1f} mm")
@@ -107,7 +107,7 @@ src/lightsheet3d/
   pipeline.py     from raw images to measurements
 tests/            synthetic unit tests and regressions on the real images
 notebooks/        three notebooks with saved outputs
-images/           raw images: target, sheet, object
+data/             raw images: camera_calibration, light_plane_calibration, scans
 docs/figures/     figures produced by the notebooks
 ```
 
