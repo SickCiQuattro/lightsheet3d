@@ -65,14 +65,14 @@ class LightPlaneCalibration:
     view_ids: np.ndarray       # (n,) quota nominale (dal nome file) della vista di ogni punto
 
 
-def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.1, seed=0, exclude=()):
+def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.1, seed=0, exclude=(), extract=laser_centroids):
     """Piano della lama dai punti delle immagini con la lama sul master a z noto (viste in `exclude` escluse)."""
     points, view_ids = [], []
     for path in sorted(Path(lama_dir).glob("*.jpg")):
         z = z_from_name(path)
         if z > z_max or z in exclude:
             continue
-        uv = model.undistort(laser_centroids(cv.imread(str(path))))
+        uv = model.undistort(extract(cv.imread(str(path))))
         points.append(ray_plane_point(model.P, uv, z))
         view_ids.append(np.full(len(uv), z))
     points, view_ids = np.vstack(points), np.concatenate(view_ids)
@@ -81,7 +81,7 @@ def calibrate_light_plane(lama_dir, model, z_max=PLATE_Z, validation_fraction=0.
     return LightPlaneCalibration(fit_plane(points[~is_validation]), points, is_validation, view_ids)
 
 
-def scan_points(image_path, model, plane):
+def scan_points(image_path, model, plane, extract=laser_centroids):
     """Punti oggetto (n, 3) in mm del profilo illuminato dalla lama in un'immagine grezza."""
-    uv = model.undistort(laser_centroids(cv.imread(str(image_path))))
+    uv = model.undistort(extract(cv.imread(str(image_path))))
     return triangulate(model.P, uv, plane)

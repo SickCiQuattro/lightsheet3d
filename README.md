@@ -94,6 +94,21 @@ The synthetic data found four defects, each now covered by a test that fails wit
 - **Centroid of the sheet.** It used only the saturated core, with half a pixel of resolution; it is now weighted by the intensity on the soft edges (median error without noise from 0.10 to 0.03 mm).
 - **Blob detector and profile alignment.** OpenCV's blob detector rejects circles above 5000 px², which dropped the large circles of the "L" when the master was close; and `align` could pick the mirrored profile with 2 px of noise because the vertical error was almost tied. It now decides with the distance in the (y, h) plane. The grid orientation is also fixed from the arms of the "L", since `findCirclesGrid` cannot tell a symmetric grid from its 180° rotation.
 
+### Sheet extraction: centroid or Steger
+
+The default finds the sheet with an intensity-weighted centroid on the saturated core. `--extractor steger` (or `laser_steger`) refines the position with Steger's ridge detection along the normal of the line, inside the same saturated region, so it finds the same rows. With a blurred sheet and noise on the intensities it halves the error; on the real images it does not help, so the centroid stays the default and Steger, 11 times slower, is an option.
+
+![Median distance from the true profile with the two extractors, on synthetic and real data](docs/figures/stripe_extraction.png)
+
+| Synthetic, Corpo 6 | Centroid | Steger |
+|---|---|---|
+| sharp | 0.032 mm | 0.030 mm |
+| blurred 1.5 px + noise 8 | 0.111 mm | 0.063 mm |
+| blurred 2.5 px + noise 12 | 0.328 mm | 0.171 mm |
+| **Real, Corpo 6 / Corpo 5** | 0.546 / 0.624 mm | 0.679 / 0.619 mm |
+
+The real sheet is wide (about 18 px of saturated core) and well contrasted, which is where the centroid is already accurate, and the real error is dominated by the calibration (next section), not by the extraction. Two details matter for Steger: its scale `sigma` has to be at least width / (2√3), so it is derived from the width of the saturated core, and near the end of an interrupted line the normal rotates and the position can jump by several pixels, so it falls back to the centroid when the ridge is more than 1 px away from it. A version that took its candidates from a response threshold instead of the saturated core lost a quarter of the rows on the real images and broke on noisy synthetic ones.
+
 ## Sensitivity to the calibration
 
 With six views of the master and one scan per solid there is no classical error estimate. [Notebook 5](notebooks/05_uncertainty.ipynb) recalibrates leaving out one view at a time (the view is dropped from both the camera and the light plane) and measures how much the result moves, on the real data and on synthetic data with the same geometry.
@@ -136,7 +151,7 @@ data/scans/30o34.jpg: 1390 points
   comparison with Corpo 6: median distance 0.55 mm, 90th percentile 1.52 mm (563 points on the solid)
 ```
 
-`lightsheet3d synthetic DIR --noise 0.5` writes a synthetic dataset with the same layout as `data/`, so the three commands also run on data with a known answer.
+`lightsheet3d calibrate ... --extractor steger` uses Steger's method (stored in the calibration file and reused by `scan`). `lightsheet3d synthetic DIR --noise 0.5` writes a synthetic dataset with the same layout as `data/`, so the three commands also run on data with a known answer.
 
 The same steps from Python:
 

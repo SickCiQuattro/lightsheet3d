@@ -11,6 +11,7 @@ import cv2 as cv
 import numpy as np
 
 from .calibration import distort_points, project
+from .laser import laser_centroids
 from .measure import level_to_plate
 from .pipeline import PLATE_Z, Z_BASE, Z_STEP, calibrate_camera, calibrate_light_plane, scan_points
 from .solids import align, distances, nominal_curve
@@ -85,22 +86,30 @@ def render_master(scene, z, noise_px=0.0, rng=None):
     return image
 
 
-def _draw_sheet(scene, world, noise_px, rng):
-    """Lama (saturata su tutti i canali, come nelle foto reali) lungo la curva 3D `world`."""
+def _draw_sheet(scene, world, noise_px, rng, blur=0.0, grain=0.0):
+    """Lama (saturata su tutti i canali, come nelle foto reali) lungo la curva 3D `world`.
+
+    `blur` (px, deviazione standard) sfuma la lama come l'ottica reale; `grain` (livelli di grigio)
+    aggiunge rumore gaussiano alle intensità. Entrambi lasciano la geometria intatta.
+    """
     image = _blank(scene)
     uv = scene.to_pixels(world) + rng.normal(0, noise_px, (len(world), 2))
     cv.polylines(image, [np.array([[_sub(u), _sub(v)] for u, v in uv])], False, (255, 255, 255), 5, cv.LINE_AA, shift=4)
+    if blur:
+        image = cv.GaussianBlur(image, (0, 0), blur)
+    if grain:
+        image = np.clip(image + rng.normal(0, grain, image.shape), 0, 255).astype(np.uint8)
     return image
 
 
-def render_sheet_on_master(scene, z, noise_px=0.0, rng=None):
+def render_sheet_on_master(scene, z, noise_px=0.0, rng=None, blur=0.0, grain=0.0):
     """Lama sul master piano a quota `z`."""
     rng = rng or np.random.default_rng(0)
     y = np.arange(-130, 151, 1.0)
-    return _draw_sheet(scene, np.column_stack([scene.sheet_x(y, z), y, np.full(len(y), float(z))]), noise_px, rng)
+    return _draw_sheet(scene, np.column_stack([scene.sheet_x(y, z), y, np.full(len(y), float(z))]), noise_px, rng, blur, grain)
 
 
-def render_scan(scene, solid, sign=1, shift=0.0, noise_px=0.0, rng=None):
+def render_scan(scene, solid, sign=1, shift=0.0, noise_px=0.0, rng=None, blur=0.0, grain=0.0):
     """Lama su un solido appoggiato al piano z = PLATE_Z; il profilo nominale è la verità a terra."""
     rng = rng or np.random.default_rng(0)
     yn, hn = nominal_curve(solid, sign, shift)
@@ -109,10 +118,10 @@ def render_scan(scene, solid, sign=1, shift=0.0, noise_px=0.0, rng=None):
     dense = np.concatenate([np.linspace(a, b, max(2, int(np.hypot(*(b - a)))))
                             for a, b in zip(np.column_stack([y, z])[:-1], np.column_stack([y, z])[1:])])
     y, z = dense[:, 0], dense[:, 1]
-    return _draw_sheet(scene, np.column_stack([scene.sheet_x(y, z), y, z]), noise_px, rng)
+    return _draw_sheet(scene, np.column_stack([scene.sheet_x(y, z), y, z]), noise_px, rng, blur, grain)
 
 
-def write_dataset(scene, solid, out_dir, sign=1, shift=-57.0, noise_px=0.0, seed=0):
+def write_dataset(scene, solid, out_dir, sign=1, shift=-57.0, noise_px=0.0, seed=0, blur=0.0, grain=0.0):
     """Scrive un dataset con la struttura di `data/`; restituisce (cartella, nome della scansione)."""
     out, rng = Path(out_dir), np.random.default_rng(seed)
     names = {"camera_calibration": "{n}.jpg", "light_plane_calibration": "{n}l.jpg"}
@@ -120,24 +129,27 @@ def write_dataset(scene, solid, out_dir, sign=1, shift=-57.0, noise_px=0.0, seed
         (out / sub).mkdir(parents=True, exist_ok=True)
     for z in VIEWS:
         n = (z - Z_BASE) // Z_STEP
-        for sub, render in (("camera_calibration", render_master), ("light_plane_calibration", render_sheet_on_master)):
-            cv.imwrite(str(out / sub / names[sub].format(n=n)), render(scene, z, noise_px, rng), [cv.IMWRITE_JPEG_QUALITY, 95])
+        for sub, image in (("camera_calibration", render_master(scene, z, noise_px, rng)),
+                           ("light_plane_calibration", render_sheet_on_master(scene, z, noise_px, rng, blur, grain))):
+            cv.imwrite(str(out / sub / names[sub].format(n=n)), image, [cv.IMWRITE_JPEG_QUALITY, 95])
     scan = "30o1.jpg"
-    cv.imwrite(str(out / "scans" / scan), render_scan(scene, solid, sign, shift, noise_px, rng), [cv.IMWRITE_JPEG_QUALITY, 95])
+    image = render_scan(scene, solid, sign, shift, noise_px, rng, blur, grain)
+    cv.imwrite(str(out / "scans" / scan), image, [cv.IMWRITE_JPEG_QUALITY, 95])
     return out, scan
 
 
-def evaluate(solid, work_dir, noise_px=0.0, shift=-57.0, seed=0, scene=None):
+def evaluate(solid, work_dir, noise_px=0.0, shift=-57.0, seed=0, scene=None, blur=0.0, grain=0.0, extract=laser_centroids):
     """Genera un dataset, esegue la pipeline e confronta il profilo con la verità a terra.
 
     Restituisce un dizionario con `camera`, `light`, il profilo (`y`, `h`), il verso e la traslazione
-    trovati da `align` e la distanza (mm) di ogni punto dal profilo nominale (`dist`).
+    trovati da `align` e la distanza (mm) di ogni punto dal profilo nominale (`dist`). `extract` è la
+    funzione che trova la lama in un'immagine (`laser_centroids` o `laser_steger`).
     """
     scene = scene or Scene()
-    root, scan = write_dataset(scene, solid, work_dir, shift=shift, noise_px=noise_px, seed=seed)
+    root, scan = write_dataset(scene, solid, work_dir, shift=shift, noise_px=noise_px, seed=seed, blur=blur, grain=grain)
     camera = calibrate_camera(root / "camera_calibration")
-    light = calibrate_light_plane(root / "light_plane_calibration", camera.model)
-    X = scan_points(root / "scans" / scan, camera.model, light.plane)
+    light = calibrate_light_plane(root / "light_plane_calibration", camera.model, extract=extract)
+    X = scan_points(root / "scans" / scan, camera.model, light.plane, extract=extract)
     y, h = X[:, 1], level_to_plate(X[:, 1], PLATE_Z - X[:, 2])
     sign, found = align(solid, y, h)
     yn, _ = nominal_curve(solid, sign, found)

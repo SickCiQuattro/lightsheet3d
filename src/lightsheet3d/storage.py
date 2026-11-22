@@ -14,12 +14,13 @@ VERSION = 1
 class Calibration:
     model: CameraModel
     plane: np.ndarray  # (A, B, C) di z = A x + B y + C
+    extractor: str = "centroid"  # metodo con cui è stata trovata la lama (chiave di `laser.EXTRACTORS`)
 
 
-def save_calibration(path, model, plane):
+def save_calibration(path, model, plane, extractor="centroid"):
     data = {"version": VERSION, "P": model.P.tolist(), "center": model.center.tolist(), "k": model.k.tolist(),
             "offsets": model.offsets.tolist(), "views": model.views.tolist(), "rms": model.rms,
-            "plane": np.asarray(plane, float).tolist()}
+            "plane": np.asarray(plane, float).tolist(), "extractor": extractor}
     Path(path).write_text(json.dumps(data, indent=2) + "\n")
 
 
@@ -29,4 +30,4 @@ def load_calibration(path):
         raise ValueError(f"{path}: versione {data.get('version')} non supportata (attesa {VERSION})")
     model = CameraModel(np.array(data["P"]), np.array(data["center"]), np.array(data["k"]),
                         np.array(data["offsets"]), np.array(data["views"]), float(data["rms"]))
-    return Calibration(model, np.array(data["plane"]))
+    return Calibration(model, np.array(data["plane"]), data.get("extractor", "centroid"))

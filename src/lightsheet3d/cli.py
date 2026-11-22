@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from .export import distance_colors, write_ply
+from .laser import EXTRACTORS
 from .lightplane import plane_errors
 from .measure import level_to_plate, measure_peaks
 from .pipeline import PLATE_Z, calibrate_camera, calibrate_light_plane, scan_points
@@ -16,8 +17,8 @@ from .synthetic import Scene, write_dataset
 
 def calibrate(args):
     camera = calibrate_camera(args.target_dir)
-    light = calibrate_light_plane(args.laser_dir, camera.model)
-    save_calibration(args.output, camera.model, light.plane)
+    light = calibrate_light_plane(args.laser_dir, camera.model, extract=EXTRACTORS[args.extractor])
+    save_calibration(args.output, camera.model, light.plane, args.extractor)
     errors = plane_errors(light.plane, light.points[light.is_validation])
     print(f"camera: views {sorted(int(z) for z in set(camera.view_ids))}, skipped {list(camera.skipped)}, "
           f"rms {camera.model.rms:.2f} px")
@@ -30,7 +31,7 @@ def scan(args):
     calibration = load_calibration(args.calibration)
     solid = SOLIDS[args.solid] if args.solid else None
     for image in args.images:
-        X = scan_points(image, calibration.model, calibration.plane)
+        X = scan_points(image, calibration.model, calibration.plane, extract=EXTRACTORS[calibration.extractor])
         y, h = X[:, 1], level_to_plate(X[:, 1], PLATE_Z - X[:, 2])
         print(f"{image}: {len(X)} points")
         for i, p in enumerate(measure_peaks(y, h, prominence=args.prominence, min_separation=10), 1):
@@ -64,6 +65,7 @@ def parser():
     c.add_argument("target_dir", help="folder with the master images (e.g. data/camera_calibration)")
     c.add_argument("laser_dir", help="folder with the sheet on the master (e.g. data/light_plane_calibration)")
     c.add_argument("-o", "--output", default="calibration.json")
+    c.add_argument("--extractor", choices=sorted(EXTRACTORS), default="centroid", help="how the sheet is found in the images (default centroid)")
     c.set_defaults(run=calibrate)
 
     s = sub.add_parser("scan", help="measure the peaks of one or more images of the sheet on a solid")

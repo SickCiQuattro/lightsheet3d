@@ -50,3 +50,17 @@ def test_unsupported_calibration_version_is_rejected(tmp_path):
 
     with pytest.raises(ValueError, match="versione"):
         load_calibration(tmp_path / "old.json")
+
+
+def test_extractor_is_stored_in_the_calibration_and_reused_by_scan(workspace, tmp_path, capsys):
+    out = tmp_path / "steger.json"
+    data = workspace / "data"
+
+    assert main(["calibrate", str(data / "camera_calibration"), str(data / "light_plane_calibration"),
+                 "--extractor", "steger", "-o", str(out)]) == 0
+    capsys.readouterr()
+    assert main(["scan", str(out), str(data / "scans" / "30o1.jpg")]) == 0
+
+    assert load_calibration(out).extractor == "steger"
+    assert load_calibration(workspace / "calibration.json").extractor == "centroid"
+    assert capsys.readouterr().out.count("peak ") == 3
