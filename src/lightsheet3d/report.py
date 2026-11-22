@@ -1,4 +1,5 @@
 """Confronto fra il profilo misurato e quello nominale del solido."""
+import matplotlib.pyplot as plt
 import numpy as np
 
 from .solids import align, distances, nominal_curve
@@ -21,3 +22,31 @@ def compare_profile(ax, solid, y, h, peaks):
     ax.legend(loc="upper right")
     return {"sign": sign, "shift": shift, "median": float(np.median(d)), "points": int(on_solid.sum()),
             "rms": float(np.sqrt((d**2).mean())), "p90": float(np.percentile(d, 90))}
+
+
+def scan_3d(ax, solid, X, h, sign, shift, vmax=2.0):
+    """Curva 3D misurata sopra il solido nominale, estruso lungo x; ritorna le distanze (mm) di ogni punto.
+
+    `X` (n, 3) sono i punti della scansione e `h` l'altezza livellata di ognuno. Ogni punto è
+    colorato con la sua distanza dal profilo nominale, come nell'esportazione PLY.
+    """
+    from .export import distance_colors
+
+    y = X[:, 1]
+    far = np.ptp(y) + 2 * solid.width
+    dist = distances(solid, sign, shift, y, h, pad=far)
+    yn, hn = nominal_curve(solid, sign, shift)
+    grid_y = np.linspace(yn[1], yn[-2], 300)
+    half = solid.depth / 2
+    centre = (X[:, 0].min() + X[:, 0].max()) / 2
+    grid_x = np.linspace(centre - half, centre + half, 2)
+    surface = np.interp(grid_y, yn[1:-1], hn[1:-1])
+    xx, yy = np.meshgrid(grid_x, grid_y)
+    zz = np.tile(surface[:, None], (1, 2))
+    ax.plot_surface(xx, yy, zz, facecolors=plt.cm.Blues(0.25 + 0.5 * zz / 50), alpha=0.35, linewidth=0, shade=False)
+    ax.plot(np.full_like(grid_y, grid_x[0]), grid_y, surface, color="0.4", lw=0.8)  # spigolo di fronte, per leggere la forma
+    on_solid = (y > yn[1] - 2) & (y < yn[-2] + 2)
+    ax.scatter(X[on_solid, 0], y[on_solid], h[on_solid], c=distance_colors(dist[on_solid], vmax) / 255, s=7, depthshade=False)
+    ax.set(xlabel="X (mm)", ylabel="Y (mm)", zlabel="altezza (mm)", ylim=(yn[1] - 5, yn[-2] + 5), zlim=(0, 55))
+    ax.set_box_aspect((solid.depth / 2, yn[-2] - yn[1] + 10, 55 * 1.4))
+    return dist

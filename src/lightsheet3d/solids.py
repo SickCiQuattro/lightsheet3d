@@ -28,6 +28,7 @@ def _walk(steps):
 class Solid:
     name: str
     outline: np.ndarray  # (n, 2) x, h dei vertici, da sinistra a destra
+    depth: float = 50.0  # mm, estrusione del solido lungo x (dai disegni: 50 per il Corpo 6, 45 per il Corpo 5)
 
     @property
     def width(self):
@@ -57,7 +58,7 @@ CORPO5 = Solid("Corpo 5", _walk([
     (11.38, -11.38 * tan(radians(65))), (6.95, 6.95 * tan(radians(80))), (8, 0),
     (13.95, -13.95 * tan(radians(70))),
 ]))
-CORPO5 = Solid(CORPO5.name, np.vstack([CORPO5.outline, [CORPO5.outline[-1, 0], 0.0]]))
+CORPO5 = Solid(CORPO5.name, np.vstack([CORPO5.outline, [CORPO5.outline[-1, 0], 0.0]]), depth=45.0)
 
 SOLIDS = {"corpo5": CORPO5, "corpo6": CORPO6}
 

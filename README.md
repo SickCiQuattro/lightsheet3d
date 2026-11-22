@@ -62,6 +62,14 @@ flowchart LR
 
 </details>
 
+## 3D curve and point export
+
+Each scan is the 3D curve where the sheet meets the solid. It lies on the plane of the sheet, so it is not a full 3D scan (that would need the solid or the sheet to move). The figure shows it over the nominal profile, with each point coloured by its distance from it.
+
+![Measured 3D curve of Corpo 6 over the extruded nominal profile](docs/figures/scan_3d.png)
+
+[docs/examples/corpo6_scan.ply](docs/examples/corpo6_scan.ply) holds the same points and colours (x, y and height in mm), and opens in MeshLab, CloudCompare or Open3D. `lightsheet3d.export.write_ply` writes any point array.
+
 ## Validation on synthetic data
 
 Real images have no ground truth, so the measured error mixes the algorithm and the setup. `lightsheet3d.synthetic` renders images of a known scene (camera parameters taken from the real calibration, circle master, light sheet, a solid with its nominal profile) with the same names and format as the real ones; the pipeline reads them unchanged and the result is compared with the true geometry.
