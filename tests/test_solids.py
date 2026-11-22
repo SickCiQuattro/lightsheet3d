@@ -5,7 +5,18 @@ import numpy as np
 import pytest
 from scipy.spatial import cKDTree
 
-from lightsheet3d.solids import CORPO1, CORPO2, CORPO3, CORPO4, CORPO5, CORPO6, SOLIDS, align, nominal_curve
+from lightsheet3d.solids import (
+    CORPO1,
+    CORPO2,
+    CORPO3,
+    CORPO4,
+    CORPO5,
+    CORPO6,
+    SOLIDS,
+    align,
+    align_oblique,
+    nominal_curve,
+)
 
 
 def _rise(h, deg):
@@ -94,3 +105,22 @@ def test_nominal_curve_is_increasing_in_y_in_both_directions():
         y, h = nominal_curve(CORPO6, sign, 0.0)
 
         assert np.all(np.diff(y) >= 0) and h.max() == pytest.approx(45.0, abs=0.01)
+
+
+@pytest.mark.parametrize("solid, scale", [(CORPO6, 1.0), (CORPO6, 1.25), (CORPO4, 1.15), (CORPO3, 1.4)])
+def test_align_oblique_recovers_the_stretch_of_a_skewed_placement(solid, scale):
+    yn, hn = nominal_curve(solid, 1, -40.0, scale=scale)
+    y = np.linspace(yn[0] - 30, yn[-1] + 30, 700)
+    h = np.interp(y, yn, hn, left=0.0, right=0.0) + np.random.default_rng(0).normal(0, 0.2, y.size)
+
+    sign, shift, found = align_oblique(solid, y, h)
+
+    assert sign == 1 and found == pytest.approx(scale, abs=0.04)
+    assert shift == pytest.approx(-40.0, abs=0.5 + 3 * (scale - 1))
+
+
+def test_align_oblique_never_shrinks_the_profile():
+    yn, hn = nominal_curve(CORPO5, 1, 0.0)
+    y = np.linspace(-30, 110, 600)
+
+    assert align_oblique(CORPO5, y, np.interp(y, yn, hn, left=0.0, right=0.0))[2] >= 1.0

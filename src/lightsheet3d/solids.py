@@ -74,17 +74,47 @@ def align(solid, y, h, clip=5.0, step=0.1, candidates=4, refine=1.0):
     return best[1], best[2]
 
 
-def nominal_curve(solid, sign, shift, pad=PAD):
-    """(y, h) del profilo nominale nel riferimento della scansione, con ± `pad` mm di piano."""
+def align_oblique(solid, y, h, clip=5.0, max_scale=1.6):
+    """(segno, traslazione, scala): come `align`, con in più l'allungamento lungo Y di un taglio obliquo.
+
+    Verso, scala (da 1 a `max_scale`) e traslazione si cercano insieme, perché con un taglio molto obliquo
+    il profilo di un solido quasi simmetrico può sembrare speculare: prima su griglia grossolana con lo
+    scarto verticale limitato a `clip` mm, poi su griglia fine attorno al minimo, infine con la distanza nel
+    piano (y, h). La scala è sempre >= 1; l'angolo fra la lama e la normale all'asse del solido è arccos(1 / scala).
+    """
+    y, h = np.asarray(y), np.asarray(h)
+
+    def vertical_cost(sign, shift, scale):
+        yn, hn = nominal_curve(solid, sign, shift, scale=scale)
+        return np.minimum(np.abs(h - np.interp(y, yn, hn, left=0.0, right=0.0)), clip).mean()
+
+    def search(signs, scales, shifts):
+        return min((vertical_cost(sign, shift, scale), sign, scale, shift) for sign in signs for scale in scales for shift in shifts)
+
+    reach = solid.width * max_scale
+    _, sign, scale, shift = search((1, -1), np.arange(1.0, max_scale + 1e-9, 0.05), np.arange(y.min() - reach, y.max() + reach, 0.5))
+    _, sign, scale, shift = search((sign,), np.arange(max(1.0, scale - 0.05), scale + 0.051, 0.01), np.arange(shift - 1.5, shift + 1.51, 0.1))
+    far = (np.ptp(y) + 2 * solid.width) * max_scale
+    best = min((np.minimum(distances(solid, sign, shift + d, y, h, pad=far, scale=max(1.0, scale + e)), clip).mean(),
+                max(1.0, scale + e), shift + d) for d in np.arange(-0.5, 0.51, 0.1) for e in (-0.01, 0.0, 0.01))
+    return sign, float(best[2]), float(best[1])
+
+
+def nominal_curve(solid, sign, shift, pad=PAD, scale=1.0):
+    """(y, h) del profilo nominale nel riferimento della scansione, con ± `pad` mm di piano.
+
+    `scale` allunga il profilo lungo Y: un solido posato di traverso rispetto alla lama è tagliato in
+    modo obliquo e il suo profilo risulta allungato di 1/cos(angolo) (vedi `align_oblique`).
+    """
     x, h = solid.outline[::sign].T  # con verso invertito i vertici si percorrono da destra
-    y = sign * x + shift
+    y = sign * scale * x + shift
     return np.concatenate([[y[0] - pad], y, [y[-1] + pad]]), np.concatenate([[0.0], h, [0.0]])
 
 
-def distances(solid, sign, shift, y, h, step=0.05, pad=PAD):
+def distances(solid, sign, shift, y, h, step=0.05, pad=PAD, scale=1.0):
     """Distanza (mm) di ogni punto misurato dal profilo nominale allineato, misurata nel piano
     (y, h): a differenza dello scarto in altezza non amplifica gli errori sui fianchi ripidi."""
-    yn, hn = nominal_curve(solid, sign, shift, pad)
+    yn, hn = nominal_curve(solid, sign, shift, pad, scale)
     dense = np.vstack([np.linspace(a, b, max(2, int(np.hypot(*(b - a)) / step)))
                        for a, b in zip(np.column_stack([yn, hn])[:-1], np.column_stack([yn, hn])[1:])])
     return cKDTree(dense).query(np.column_stack([y, h]))[0]

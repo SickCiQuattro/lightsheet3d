@@ -11,10 +11,11 @@ import cv2 as cv
 import numpy as np
 
 from .calibration import distort_points, project
+from .dataset import Dataset
 from .laser import laser_centroids
 from .measure import level_to_plate
 from .pipeline import PLATE_Z, Z_BASE, Z_STEP, calibrate_camera, calibrate_light_plane, scan_points
-from .solids import align, distances, nominal_curve
+from .solids import SOLIDS, align, distances, nominal_curve
 
 FOCAL = 1955.0                   # px, per la dimensione apparente dei cerchi
 LARGE = {(0.0, 0.0), (60.0, 0.0), (0.0, 40.0)}  # "L" di cerchi grandi: origine, +x, +y (mm)
@@ -135,6 +136,10 @@ def write_dataset(scene, solid, out_dir, sign=1, shift=-57.0, noise_px=0.0, seed
     scan = "30o1.jpg"
     image = render_scan(scene, solid, sign, shift, noise_px, rng, blur, grain)
     cv.imwrite(str(out / "scans" / scan), image, [cv.IMWRITE_JPEG_QUALITY, 95])
+    key = next((k for k, v in SOLIDS.items() if v is solid), None)
+    if key:  # il manifest con la verità: la scansione è di questo solido
+        (out / "scans.csv").write_text(f"file,solid,role\n{scan},{key},test\n")
+    Dataset(root=out, image_size=scene.image_size, pitch_mm=scene.pitch, manifest="scans.csv" if key else None).write()
     return out, scan
 
 

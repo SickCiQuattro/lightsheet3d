@@ -1,0 +1,14 @@
+# Laboratorio di Sistemi di Visione 3D, Università di Brescia, A.A. 2024/25.
+# z (mm) di un'immagine di taratura = prime due cifre del nome * z_scale + z_offset (26.jpg -> 310).
+image_size = [2130, 1420]
+pitch_mm = 20.0
+pattern_max = [21, 14]
+pattern_min = 9
+z_scale = 10.0
+z_offset = 50.0
+reference_z = 350.0
+plate_z = 350.0
+target_dir = "camera_calibration"
+sheet_dir = "light_plane_calibration"
+scans_dir = "scans"
+manifest = "scans.csv"
