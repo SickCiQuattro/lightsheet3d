@@ -10,7 +10,7 @@ name = "light-sheet-3d-scanner"
 version = "0.1.0"
 description = "Scanner 3D a lama di luce: calibrazione camera, calibrazione del piano laser e triangolazione di profili."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.4",
     "opencv-python-headless>=5.0.0.93",
